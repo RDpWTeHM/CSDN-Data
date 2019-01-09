@@ -1,0 +1,28 @@
+{# CSDNVisualize/CSDNCrawler/templates/visual/mission.html #}
+<!DOCTYPE html>
+<html>
+<head>
+	<title>CSDN Personal Profile Crawler</title>
+</head>
+<body>
+	<h1>Hello, you are in CSDN Personal Profile!</h1>
+
+{% if new_missions %}
+	<table>
+		<tr>
+			<th>webname: </th>
+			<th>user id</th>
+		</tr>
+		{% for webname, userid in new_missions.items %}
+		<tr>
+			<td><strong>{{ webname }}: </strong></td>
+			<td><i>{{ userid }}</i></td>
+		</tr>
+		{% endfor %}
+	</table>
+{% else %}
+    <p><strong>No new mission are available!</strong></p>
+{% endif %}
+
+</body>
+</html>

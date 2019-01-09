@@ -1,0 +1,45 @@
+{# visualize/follows_detail.hmtl #}
+
+{% extends 'visualize/bootstrapbase.html' %}
+
+	{% block title_text %}User ID Follows | CSDN Crawler{% endblock %}
+
+{% block js_in_head %}  
+{% endblock js_in_head %}
+
+{% block body %}
+<div class="container">
+	<div class="row">
+	<div class="col-md-12 push-md-3 jumbotron">
+		<div class="text-center">
+		<h1>Followed by {{ userid_obj.user_id }}</h1>
+		</div>
+	</div></div>
+
+    <div class="row">
+		<div class="col-md-12 push-md-3">
+		<table name="id_list_table" id='id_list_table'
+		       class="table table-hover">
+		    <thead>
+			<tr><th>DB index</th>
+				<th>CSDN ID</th>
+				<th>CSDN Name</th>
+				<th>Crawl date</th>
+				<th>total follows number</th></tr>
+			</thead>
+
+			<tbody>
+		{% for each_follow in userid_obj.follows_set.all %}
+			<tr><th scope="row">{{ each_follow.id }}</th>
+				<td>{{ each_follow.follow_id }}</td>
+				<td>{{ each_follow.follow_name }}</td>
+				<td style="color: green; font-size: 12px">
+					{{ each_follow.crawledDate |date:"Y-m-d H:i" }}</td>
+				<td>{{ each_follow.current_total_follows_num }}</td>
+			</tr>
+		{% endfor %}
+			</tbody>
+		</table>
+		</div></div>
+</div>
+{% endblock body %}

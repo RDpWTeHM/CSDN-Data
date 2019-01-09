@@ -1,0 +1,56 @@
+{# CSDNVisualize/CSDNCrawler/templates/visualize/detail.html #}
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Bootstrap CSS -->
+  <link href="/static/bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+
+	<title>Detail | CSDN Crawler</title>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+      <div class="col-md-6 col-md-offset-3">
+      <div class="text-center">
+		<h1>{{ userid.user_id }}</h1>
+      </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 col-md-offset-3">
+	<table class="table" style="word-break:break-all; word-wrap:break-all;">
+		<tr><th style="width: 160px">日期/date</th>
+			<th style="width: 80px">原创/originality</th>
+			<th style="width: 75px">粉丝/fans</th>
+			<th style="width: 75px">点赞/likes</th>
+			<th style="width: 75px">评论/comments</th>
+			<th style="width: 80px">等级/CSDN level</th>
+			<th style="width: 120px">浏览量/visitors</th>
+			<th style="width: 100px">积分/integration</th>
+			<th style="width: 150px">排名/rank</th></tr>
+		{% for visualdata in userid.visualdata_set.all %}
+		{# <tr><td style="color: green; font-size: 12px">{{ visualdata.crawlerDate.date }}</td> #}
+		<tr><td style="color: green; font-size: 12px">{{ visualdata.crawlerDate |date:"Y-m-d H:i" }}</td>
+			<td>{{ visualdata.originality }}</td>
+			<td>{{ visualdata.fans }}</td>
+			<td>{{ visualdata.likes }}</td>
+			<td>{{ visualdata.comments }}</td>
+			<td>{{ visualdata.csdnlevel }}</td>
+			<td>{{ visualdata.visitors }}</td>
+			<td>{{ visualdata.intergration }}</td>
+			<td>{{ visualdata.rank }}</td></tr>
+		{% endfor %}
+	</table>
+	<style type="text/css">
+		.table {table-layout:fixed;}
+	</style>
+      </div>
+    </div>
+</div>
+</body>
+</html>
