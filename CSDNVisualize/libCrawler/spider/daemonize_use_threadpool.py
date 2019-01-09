@@ -56,13 +56,12 @@ else:
           "current work path for now!")
     sys.exit(1)  # command error!
 
+
 Qin = queue.Queue()
 Qout = queue.Queue()
 Qerr = queue.Queue()
 
 Pool = []
-
-browserQ = queue.Queue()
 
 sys.path.append(os.getcwd())
 from daemon.RunProgasDaemon import daemonize
@@ -71,6 +70,11 @@ sys.path.append(os.getcwd()[:os.getcwd().find("CSDNVisualize/libCrawler")-1])
 import conf.handler_pagesource
 CONF = conf.handler_pagesource.conf
 MAX_BROWSER_RUN = CONF.MAX_BROWSER_RUN
+
+browserQ = queue.Queue()
+# 2019/01/09 update
+from spider.resourcemanage import Resource
+from spider.resourcemanage import manage_selenum
 
 from spider.threadpool import *
 
@@ -91,6 +95,10 @@ from spider.sites.csdn import DaemonCrawlerClickError
 
 def do_work_from_queue():
     '''工作线程的“获得一点工作”，“做一点工作的主循环”'''
+    # 2019/01/09 update
+    res = Resource()
+    thisThreadBrowser = None
+
     while True:
         command, item = Qin.get()  # 这里可能会停止并等待
         logging.info("command: {}; type(item): {}".format(command, type(item)))
@@ -105,7 +113,14 @@ def do_work_from_queue():
                 req_data, conn = item  # 元组拆包
                 logging.warning("req_data: {}; conn: {}".format(req_data, str(conn)))
                 try:
-                    thisThreadBrowser = browserQ.get()  # this may block
+                    # thisThreadBrowser = browserQ.get()  # this may block
+                    try:
+                        thisThreadBrowser = res.acquire_browser_handler_by_create()
+                    except Exception:  # -[o] not decide yet
+                        thisThreadBrowser = res.acquire_browser_handler_from_queue()
+                    if not thisThreadBrowser:
+                        raise RuntimeError("Can not acquire browser resource")
+
                     safe_get_tab = thisThreadBrowser.window_handles[0]
                     logging.info("str(thisThreadBrowser) = %s" % (str(thisThreadBrowser)))
                     excute_script_str = "window.open('{}','CSDN-Data');".format("about:blank")
@@ -136,7 +151,7 @@ def do_work_from_queue():
                 except DaemonCrawlerClickError as err:
                     logging.error("%s @ %s" % (req_data['req_url'], err))
                     conn.send("Crawler Error")
-                except WebDriverException as err:
+                except (WebDriverException, RuntimeError) as err:
                     # sys.stderr.write("selenium > browser issue?：{}".format(err))
                     logging.error("selenium > browser issue?：{}".format(err))
                     conn.send("Crawler Error")
@@ -148,7 +163,9 @@ def do_work_from_queue():
                 finally:
                     thisThreadBrowser.close()
                     thisThreadBrowser.switch_to.window(safe_get_tab)
-                    browserQ.put(thisThreadBrowser)
+                    # browserQ.put(thisThreadBrowser)
+                    res.release_browser_handler(thisThreadBrowser)
+                    thisThreadBrowser = None
             else:
                 raise (ValueError, 'Unknown command %r' % command)
         except Exception as e:
@@ -158,6 +175,7 @@ def do_work_from_queue():
                 item, command, e))
             '''
             logging.error('<{}>@<{}>: {}'.format(item, command, e))
+            thisThreadBrowser = None
             # report_error()
             pass  # 还没有理清如何使用队列来处理线程输出
         else:
@@ -328,13 +346,6 @@ def main(argc, argv):
     dispatcher()
 
 
-# -[o] not right value here:
-DJANGO_PROJ_PATH = "/home/joseph/Devl/SVN/myGit/Gitee/Practice/daemon/test/create4test/"
-DJANGO_PROJ_ARGV = " runserver 0.0.0.0:8000 "
-DJANGO_PROJ_LOG  = "/tmp/django_proj_create4test.log"
-SHELL_ARGV = " > {} 2>&1 & ".format(DJANGO_PROJ_LOG)
-
-
 if __name__ == '__main__':
     PIDFILE = CONF.PIDFILE
 
@@ -347,6 +358,12 @@ if __name__ == '__main__':
         #
         # start Browser
         #
+        # 2019/01/09 update
+        t = threading.Thread(target=manage_selenum)
+        t.setDaemon(True)
+        t.start()
+        del t
+
         def _debug_startBrowser(i):
             capa = DesiredCapabilities().CHROME
             capa["pageLoadStrategy"] = "none"
@@ -370,29 +387,6 @@ if __name__ == '__main__':
                 320 * x * 20, 320 * y * 20)  # *100 是临时手动适配！
             browserQ.put(browser)
             del browser
-
-        # setup browsers
-        # 放在 daemonize 之前，确保 browser.quit() 之后，剩余的浏览器资源可以被 init 回收。
-        if __debug__:
-            setupbrowser_threads = []
-            for i in range(MAX_BROWSER_RUN):
-                t = threading.Thread(
-                    target=_debug_startBrowser, args=(i, ))
-                t.setDaemon(True)
-                setupbrowser_threads.append(t)
-            for i in range(MAX_BROWSER_RUN):
-                setupbrowser_threads[i].start()
-            for i in range(MAX_BROWSER_RUN):
-                setupbrowser_threads[i].join()
-        else:
-            print("!!!!!update no __debug__ mode code!!!!!!", file=sys.stderr)
-            sys.exit(1)
-            for i in range(MAX_BROWSER_RUN):
-                ffoptions = webdriver.FirefoxOptions()
-                ffoptions.add_argument('-headless')
-                browser = webdriver.Firefox(options=ffoptions)
-                browserQ.put(browser)
-                del browser
 
         #
         # daemonize
