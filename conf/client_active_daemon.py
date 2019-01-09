@@ -28,7 +28,7 @@ conf = Configuration(
 
     THREAD_NUM=2,
 
-    LOGGING_FILE="/mnt/banq_16g/CSDN-Data/log/client_active_daemon/20190107_1917.log",
+    LOGGING_FILE="/mnt/banq_16g/CSDN-Data/log/client_active_daemon/20190109_1710.log",
 
     NOSERVER_BASEWAITE=30,  # no django server running, wait increase by 30s
 )
