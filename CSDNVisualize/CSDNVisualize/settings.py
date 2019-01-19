@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     # Install (plug)
     #
     'rest_framework',
+
+    'django_extensions',
 ]
 
 MIDDLEWARE = [

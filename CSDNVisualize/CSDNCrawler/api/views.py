@@ -21,7 +21,63 @@ from rest_framework.response import Response
 from ..models import UserID
 from ..models import Fans
 # serialize
+from .serializers import UserIDSerializer
 from .serializers import FansSerializer
+
+
+class UserIDViewCommonMixin():
+    serializer_class = UserIDSerializer
+
+    def get_queryset(self):
+        return UserID.objects.all()
+
+
+class UserIDList(UserIDViewCommonMixin, generics.ListCreateAPIView):
+    def get_queryset(self):
+        if self.request.GET.get("p"):
+            try:
+                page = int(self.request.GET.get("p"))
+                idx_h = page * 50
+                idx_e = (page + 1) * 50
+                objs = UserID.objects.all()
+                length = len(objs)
+                if page >= 0:
+                    if idx_h < length < idx_e:
+                        return objs[idx_h:]
+                    elif idx_h > length:
+                        raise IndexError("out of range")
+                    elif idx_e < length:
+                        return objs[idx_h:idx_e]
+                else: raise IndexError("not support negative yet")
+            except IndexError as e:
+                print(e, file=sys.stderr)
+                raise Http404("{}".format(e))  # -[o] update to DRF response type later
+        else:
+            try:
+                objs = super().get_queryset()
+                if len(objs) <= 50:
+                    return objs
+                else:
+                    return objs[:50]
+            except ValueError as e:
+                raise Http404("wrong index page")  # -[o] update to DRF response type later
+
+
+class UserIDDetail(UserIDViewCommonMixin, mixins.UpdateModelMixin, generics.RetrieveDestroyAPIView):
+    '''n/a'''
+
+    def get_object(self):
+        user_id = self.kwargs['user_id']
+        try:
+            # userid = self.get_queryset().filter(
+            #     Q(user_id=user_id)).distinct()[0]
+            userid = get_object_or_404(UserID, user_id=user_id)
+        except KeyError:
+            raise Http404("require user_id")  # -[o] update to DRF response type later
+        return userid
+
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
 
 
 class FansList(generics.ListCreateAPIView):

@@ -1,6 +1,9 @@
 from django.urls import path, re_path
 from django.http import HttpResponse
 
+from .views import UserIDList
+from .views import UserIDDetail
+
 from .views import FansList
 from .views import FansDetail
 
@@ -12,8 +15,9 @@ urlpatterns = [
     #
     # /userids/[.../]
     #
-    # n/a... ###################
-    # path("userids/<str:user_ids>/"),
+    # userids/[{}/] ###################
+    path("userids/",                UserIDList.as_view(), name="userids_list"),
+    path("userids/<str:user_id>/", UserIDDetail.as_view(), name="userids_detail"),
 
     # fanses/[{}/] #########################
     path("userids/<str:user_id>/fanses/",                FansList.as_view(), name="fans_list"),

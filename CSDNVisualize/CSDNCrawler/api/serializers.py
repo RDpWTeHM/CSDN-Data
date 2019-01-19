@@ -11,3 +11,9 @@ class FansSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
         # read_only_fields = [ ]
+
+
+class UserIDSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserID
+        fields = '__all__'
