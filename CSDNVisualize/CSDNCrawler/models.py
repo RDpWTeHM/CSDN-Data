@@ -48,16 +48,20 @@ class Article(models.Model):
 
 class VisualData(models.Model):
     user_id = ForeignKey(UserID, on_delete=models.CASCADE)
-    crawlerDate = DateTimeField('data crowler date', default=timezone.now)
+    crawlerDate = DateTimeField('data crowler date', auto_now=True)
+
     originality = IntegerField(default=-1)  # 原创文章数量
+    reprint = IntegerField(default=-1)  # 转发数量
+
     fans = IntegerField(default=-1)  # 粉丝数量
+    follow = IntegerField(default=-1)  # 关注数量
+
     likes = IntegerField(default=-1)  # 总点赞数量
     comments = IntegerField(default=-1)  # 总评论数量
     csdnlevel = IntegerField(default=-1)  # 等级
     visitors = IntegerField(default=-1)  # 访问量
     intergration = IntegerField(default=-1)  # 积分
     rank = IntegerField(default=-1)  # 排名
-    # 勋章
 
     def __str__(self):
         return "userid: " + str(self.user_id)

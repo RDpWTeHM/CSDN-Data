@@ -5,7 +5,7 @@ from django.shortcuts import Http404, get_object_or_404
 from django.http import JsonResponse
 
 import sys
-
+import datetime
 
 #####################################
 # generic views
@@ -19,9 +19,11 @@ from rest_framework.response import Response
 # model
 #
 from ..models import UserID
+from ..models import VisualData
 from ..models import Fans
 # serialize
 from .serializers import UserIDSerializer
+from .serializers import VisualDataSerialzier
 from .serializers import FansSerializer
 
 
@@ -114,3 +116,32 @@ class FansDetail(mixins.UpdateModelMixin, generics.RetrieveDestroyAPIView):
 
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
+
+
+class VisualDataViewCommonMixin(object):
+    serializer_class = VisualDataSerialzier
+
+    def get_queryset(self):
+        _ = get_object_or_404(UserID, user_id=self.kwargs["user_id"])
+        return _.visualdata_set.all()
+
+
+class VisualDataList(VisualDataViewCommonMixin, generics.ListCreateAPIView):
+    ''' n/a'''
+
+
+class VisualDataDetail(VisualDataViewCommonMixin, generics.RetrieveDestroyAPIView):
+    '''n/a '''
+
+    def get_object(self):
+        try:
+            visualdatas = super().get_queryset()
+            filter_date = datetime.datetime.strptime(
+                self.kwargs['date'], "%Y-%m-%d").date()
+            qs = visualdatas.filter(crawlerDate__year=filter_date.year,
+                                    crawlerDate__month=filter_date.month, )
+            d = {_.crawlerDate.day: _ for _ in qs}
+            return d[min(d.keys(), key=lambda _: abs(_ - filter_date.day))]
+        except Exception as e:
+            print(e, file=sys.stderr)
+            raise Http404("{}".format(e))  # -[o] update to DRF response type later

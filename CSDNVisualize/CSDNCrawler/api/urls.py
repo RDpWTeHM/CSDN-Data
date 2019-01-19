@@ -4,6 +4,9 @@ from django.http import HttpResponse
 from .views import UserIDList
 from .views import UserIDDetail
 
+from .views import VisualDataList
+from .views import VisualDataDetail
+
 from .views import FansList
 from .views import FansDetail
 
@@ -15,13 +18,17 @@ urlpatterns = [
     #
     # /userids/[.../]
     #
-    # userids/[{}/] ###################
+    # [{}/] ###################
     path("userids/",                UserIDList.as_view(), name="userids_list"),
     path("userids/<str:user_id>/", UserIDDetail.as_view(), name="userids_detail"),
 
+    # visualdatas/[{}/]
+    path("userids/<str:user_id>/visualdatas/",            VisualDataList.as_view(), name="visualdatas_list"),
+    path("userids/<str:user_id>/visualdatas/<str:date>/", VisualDataDetail.as_view(), name="visualdatas_detail"),
+
     # fanses/[{}/] #########################
-    path("userids/<str:user_id>/fanses/",                FansList.as_view(), name="fans_list"),
-    path("userids/<str:user_id>/fanses/<int:fans_idx>/", FansDetail.as_view(), name="fans_detail"),
+    path("userids/<str:user_id>/fanses/",                FansList.as_view(), name="fanses_list"),
+    path("userids/<str:user_id>/fanses/<int:fans_idx>/", FansDetail.as_view(), name="fanses_detail"),
 
     # follows/[{}/] ########################
 ]
