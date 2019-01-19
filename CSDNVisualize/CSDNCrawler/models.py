@@ -128,6 +128,9 @@ class Fans(BaseUserIDInfo):
     fans_of = models.ForeignKey(
         UserID, related_name="fanses_set", on_delete=models.CASCADE)
 
+    crawledDate = models.DateField('fans crawled date', auto_now=True)
+    current_total_fans_num = IntegerField(default=-1)
+
     def __str__(self):
         return self.user_id  # BaseUserIDInfo.user_id
 
