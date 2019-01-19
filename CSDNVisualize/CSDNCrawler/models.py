@@ -114,3 +114,22 @@ class Follows(models.Model):
 
     def __repr__(self):
         return "{!r}".format(dict(self.__dict__))
+
+
+class BaseUserIDInfo(models.Model):
+    user_id = models.CharField(max_length=128)
+    name = models.CharField(max_length=512, default='')
+
+    class Meta:
+        abstract = True
+
+
+class Fans(BaseUserIDInfo):
+    fans_of = models.ForeignKey(
+        UserID, related_name="fanses_set", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user_id  # BaseUserIDInfo.user_id
+
+    def __repr__(self):
+        return self.user_id + " in Fans table, fans of " + self.fans_of.user_id
