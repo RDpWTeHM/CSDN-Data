@@ -30,25 +30,6 @@ class DRFOperate(object):
     url = URL_HEAD + URL_CSDNCRAWLER_API_HEAD + "userids/"
     head_url = URL_HEAD + URL_CSDNCRAWLER_API_HEAD
 
-    def _gen_url(self,
-                 user_id=None, visualdatas_idx=None,
-                 fanses_idx=None, follows_idx=None):
-        url = self.url
-        if not user_id:
-            return url
-        elif user_id:
-            idx = ""
-            if not (visualdatas_idx or fanses_idx or follows_idx):
-                return url + user_id + "/"
-            elif visualdatas_idx:
-                idx = str(visualdatas_idx) + "/"
-            elif follows_idx:
-                idx = str(follows_idx) + "/"
-            elif fanses_idx:
-                idx = str(fanses_idx) + "/"
-
-            return url + user_id + "/" + idx
-
     def _handler_requests_result(self, r):
         return r.status_code, r.text
 
@@ -68,7 +49,7 @@ class DRFOperate(object):
             if isinstance(detail, str):
                 return belong_url + detail + "/"
             elif isinstance(detail, tuple):
-                return belong_url + detail[0] + "/" + detail[1] + "/"
+                return belong_url + detail[0] + "/" + "{}".format(detail[1]) + "/"
             else:
                 raise ValueError("Please use correct 'detail' type.")
         except ValueError:
@@ -93,7 +74,7 @@ class DRFOperate(object):
         if index is True and self.api_be[1]:  # retrieve obj's detail
             r = requests.get(
                 self.get_url(self.api_be, self.api_kw_belong))
-        elif index:  # retrieve specific detail
+        elif index and index is not True:  # retrieve specific detail
             r = requests.get(
                 self.get_url((self.api_be[0], index), self.api_kw_belong))
         elif index is False or not self.api_be[1]:  # retrieve list
@@ -151,10 +132,10 @@ class DBVisualData(DRFOperate):
 class DBFans(DRFOperate):
     def __init__(self, user_id, index=None):
         self.api_be = ("fanses", index)
-        self.api_kw_belong = OrderedDict({"userids"})
+        self.api_kw_belong = OrderedDict({"userids": user_id})
 
 
 class DBFollow(DRFOperate):
     def __init__(self, user_id, index=None):
         self.api_be = ("follows", index)
-        self.api_kw_belong = OrderedDict({"userids"})
+        self.api_kw_belong = OrderedDict({"userids": user_id})
