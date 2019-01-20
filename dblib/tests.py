@@ -11,7 +11,7 @@ import unittest
 import json
 
 g_userid_data = {
-    "user_id": "testcase",
+    "user_id": "unittest",
     "name": "Python 功能测试数据用例",
     "visit": 0,
     "rank": 0,
@@ -63,6 +63,7 @@ class TestLibDBUserID(unittest.TestCase):
             "visit": 19378,
             "rank": 51810,
         }
+        dbuserid = self.DBUserID(update_data["user_id"])
         ret = dbuserid.update(update_data)
         status_code, text = ret
 
