@@ -9,6 +9,7 @@ from .views import VisualDataDetail
 
 from .views import FansList
 from .views import FansDetail
+from .views import FollowList, FollowDetail
 
 
 urlpatterns = [
@@ -31,4 +32,6 @@ urlpatterns = [
     path("userids/<str:user_id>/fanses/<int:fans_idx>/", FansDetail.as_view(), name="fanses_detail"),
 
     # follows/[{}/] ########################
+    path("userids/<str:user_id>/follows/",                  FollowList.as_view(), name="follow_list"),
+    path("userids/<str:user_id>/follows/<int:follow_idx>/", FollowDetail.as_view(), name="follow_detail"),
 ]

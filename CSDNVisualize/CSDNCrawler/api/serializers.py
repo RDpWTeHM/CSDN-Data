@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from ..models import UserID
-from ..models import Fans
+from ..models import Fans, Follow
 from ..models import VisualData
 
 
@@ -12,6 +12,12 @@ class FansSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
         # read_only_fields = [ ]
+
+
+class FollowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Follow
+        fields = '__all__'
 
 
 class VisualDataSerialzier(serializers.ModelSerializer):

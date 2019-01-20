@@ -20,11 +20,11 @@ from rest_framework.response import Response
 #
 from ..models import UserID
 from ..models import VisualData
-from ..models import Fans
+from ..models import Fans, Follow
 # serialize
 from .serializers import UserIDSerializer
 from .serializers import VisualDataSerialzier
-from .serializers import FansSerializer
+from .serializers import FansSerializer, FollowSerializer
 
 
 class UserIDViewCommonMixin():
@@ -116,6 +116,33 @@ class FansDetail(mixins.UpdateModelMixin, generics.RetrieveDestroyAPIView):
 
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
+
+
+class FollowViewCommonMixin(object):
+    serializer_class = FollowSerializer
+
+    def get_queryset(self):
+        _ = get_object_or_404(UserID, user_id=self.kwargs["user_id"])
+        return _.follow_set.all()
+
+
+class FollowList(FollowViewCommonMixin, generics.ListCreateAPIView):
+    ''' n/a'''
+
+
+class FollowDetail(FollowViewCommonMixin, generics.RetrieveDestroyAPIView):
+    '''n/a '''
+
+    def get_object(self):
+        follows = super().get_queryset()
+
+        try:
+            idx = int(self.kwargs['follow_idx']) - 1
+            follow = follows[idx]
+        except Exception as err:
+            print(err, file=sys.stderr)
+            raise Http404("out of index")
+        return follow
 
 
 class VisualDataViewCommonMixin(object):

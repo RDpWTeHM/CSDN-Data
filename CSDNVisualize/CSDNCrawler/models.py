@@ -140,3 +140,17 @@ class Fans(BaseUserIDInfo):
 
     def __repr__(self):
         return self.user_id + " in Fans table, fans of " + self.fans_of.user_id
+
+
+class Follow(BaseUserIDInfo):
+    followed_by = models.ForeignKey(
+        UserID, related_name="follow_set", on_delete=models.CASCADE)
+
+    crawledDate = models.DateField('follow crawled date', auto_now=True)
+    current_total_follow_num = IntegerField(default=-1)
+
+    def __str__(self):
+        return self.user_id
+
+    def __repr__(self):
+        return self.user_id + "in follow table, is '" + self.followed_by.user_id + "' follow to"
