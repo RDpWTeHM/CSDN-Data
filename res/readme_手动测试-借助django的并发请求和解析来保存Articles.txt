@@ -1,0 +1,1 @@
+svn://localhost/oldPedant/Tag/CSDN-Data/v0.0.3/res/手动测试-借助django的并发请求和解析来保存Articles.gif
