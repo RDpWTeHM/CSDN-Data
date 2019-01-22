@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""subject.py
-
-N/A
-"""
 
 import redis
 import sys
@@ -307,15 +303,26 @@ def update_db():
     # cnblogs_com.subject.r_cb <- redis_cnblogs
     # -[x] use from Redis
     # targets_grade = ["IAMTOM", "duoduotouhenying", ]
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 598, 5000, withscores=True)  # 1592 currently
+
+    # 1592 currently
+    _raw_radis_data = r_csdn.zrangebyscore("RANK", 1, 2500, withscores=True)
     targets_grade = [_[0].decode('utf-8') for _ in _raw_radis_data]
     grades.append(targets_grade)
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 7577, 20000, withscores=False) # 1408 currently
+    _raw_radis_data = r_csdn.zrangebyscore("RANK", 2501, 5000, withscores=False)
     targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
     grades.append(targets_grade)
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 28807, 80000, withscores=False) # 1554 currently
+    # 5001~10000 => 1408 currently
+    _raw_radis_data = r_csdn.zrangebyscore("RANK", 5001, 10000, withscores=False)
+    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
+    grades.append(targets_grade)
+
+    _raw_radis_data = r_csdn.zrangebyscore("RANK", 10001, 20000, withscores=False) # 1408 currently
+    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
+    grades.append(targets_grade)
+
+    _raw_radis_data = r_csdn.zrangebyscore("RANK", 20001, 80000, withscores=False) # 1554 currently
     targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
     grades.append(targets_grade)
 
