@@ -20,4 +20,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('CSDNCrawler/', include('CSDNCrawler.urls')),
+    path("api/", include('api.urls')),
 ]
