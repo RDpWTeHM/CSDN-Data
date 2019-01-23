@@ -89,9 +89,13 @@ done_nodes = set()
 def update_from_db_by_django(N):
     node = "qq_29757283"  # start graphic node
 
+    # clean the set:
+    # todo_nodes.clear()
+    # done_nodes.clear()
     # debug_loop = 10
     debug_loop = True
     while debug_loop:
+        print("[debug] ============= the new loop ====================")
         try:
             userid = UserID.objects.get(user_id=node)
 
@@ -99,7 +103,8 @@ def update_from_db_by_django(N):
             if node not in quick_in:  # new node create.
                 N[node] = [-1, set()]
 
-            if True:  # (N[node][0] == -1) not skip already exist node
+            # if True:  # (N[node][0] == -1) not skip already exist node
+            if N[node][0] in (-1, 0):
                 follows = userid.follows_set.all()
 
                 # init not exist in graphic node
@@ -113,32 +118,35 @@ def update_from_db_by_django(N):
 
                 # setup node's status(total follow number) ##########
                 N[node][0] = len(N[node][1])  # -[o] currently skip read from DB
+            else:
+                print("[info] already satisfy this node: ", node)
 
-                #
-                # next node(grow)
-                #
-                print("[info] todo_nodes add: ", end='', flush=True)
-                for tobe_todo_node in _s:
-                    if tobe_todo_node not in done_nodes:
-                        todo_nodes.add(tobe_todo_node)
-                        print(tobe_todo_node, end=" ", flush=True)
-                print("")
+            # grow todo_nodes by follow set
+            print("[info] todo_nodes add: ", end='', flush=True)
+            for tobe_todo_node in N[node][1]:
+                if tobe_todo_node not in done_nodes:
+                    todo_nodes.add(tobe_todo_node)
+                    print(tobe_todo_node, end=" ", flush=True)
+            print("")
 
-                if node in todo_nodes:
-                    todo_nodes.remove(node)
-                    print("[info] todo_nodes remove: ", node)
-                old_done = copy.deepcopy(done_nodes)
-                done_nodes.add(node)
-                new_done = copy.deepcopy(done_nodes)
-                print("[info] new done_nodes: ", new_done-old_done)
+            # next node by todo_nodes ####################
+            if node in todo_nodes:
+                todo_nodes.remove(node)
+                print("[info] todo_nodes remove: ", node)
+            old_done = copy.deepcopy(done_nodes)
+            done_nodes.add(node)
+            new_done = copy.deepcopy(done_nodes)
+            print("[info] new done_nodes: ", new_done-old_done)
 
+            node = todo_nodes.pop()
+            while node in done_nodes:
                 node = todo_nodes.pop()
-                while node in done_nodes:
-                    node = todo_nodes.pop()
-                print("[info] new node: ", node)
-                # debug_loop -= 1
+            print("[info] new node: ", node)
+            # debug_loop -= 1
         except UserID.DoesNotExist as err:
-            # pass
+            print("[info] node: {} => {}".format(node, err))
+            # -[x] !! \/ update here \/ , is not done not-exist node, will cause loop
+            done_nodes.add(node)
             node = todo_nodes.pop()
             while node in done_nodes:
                 node = todo_nodes.pop()
