@@ -5,6 +5,7 @@ import sys
 import os
 import time
 import asyncio
+import signal
 
 
 from time import sleep
@@ -13,7 +14,8 @@ from datetime import datetime
 # from datetime import timedelta
 
 # from threading import Thread
-import threading
+# import threading
+import shelve
 from queue import Queue
 import requests
 import logging
@@ -27,7 +29,7 @@ import conf.client_active_daemon
 CONF = conf.client_active_daemon.conf
 
 logging.basicConfig(
-    filename=CONF.LOGGING_FILE,
+    # filename=CONF.LOGGING_FILE,
     level=logging.INFO,
     # level=logging.DEBUG,
     format='[%(asctime)s]%(levelname)-9s%(message)s',
@@ -66,10 +68,58 @@ except (RuntimeError, Exception):
     sys.exit(1)  # check redis DB fail
 
 
+###################################################
+# save status for stop/restart || memonto pattern #
+###################################################
+memento_name = ".memento"
+shelve_key2storage_memento_of_subject = 'subjects'
+
+
+class Memento(object):
+    def __init__(self, state):
+        self._state = state
+
+    def get_saved_state(self):
+        return self._state
+
+
+class Originator(object):
+    _state = None
+
+    def set(self, state):
+        logging.debug(
+            "Originator@{}: Setting state to {}".format(id(self), state))
+        self._state = state
+
+    def save_to_memento(self):
+        logging.debug("Originator@{}: Saving to Memento.".format(id(self)))
+        return Memento(self._state)
+
+    def restore_from_memento(self, memento):
+        self._state = memento.get_saved_state()
+        logging.info(
+            "Originator@{}: State after restoring from Memento: {}".format(
+                id(self), self._state))
+
+    def get_state(self):
+        return self._state
+
 #
 # utility
 #
 # gen_url = lambda _id: "https://me.csdn.net/{!s}".format(_id)
+g_stop_signal = False  # asycio loop
+g_asyncio_subject_tasks_number = 0
+
+
+def sigint_handler(signo, frame):
+    ''' end game'''
+    global g_stop_signal
+    g_stop_signal = True
+
+
+def prog_init():
+    signal.signal(signal.SIGINT, sigint_handler)
 
 
 class CrawlError(Exception):
@@ -90,7 +140,7 @@ class Subject(object):
       -[o] need update package reference
     '''
 
-    def __init__(self, user_ids):
+    def __init__(self, user_ids, ID, originator, saved_states):
         '''__init__
           length of user_ids => 60s x 60m x 24h
           one user_id except 10s, but wait 60s, 1x10x24 => 240
@@ -99,15 +149,47 @@ class Subject(object):
         # self.__url = gen_url(user_id)
         self.user_information = None
         self.user_article = None
+
+        # Observer ####################
+        self.__observers = set()
+
+        # memento #####################
+        self.ID = ID
+        self.originator = originator
+        self.saved_states = saved_states
+
+        # memento + observer ##########
+        # loading memento
+        try:
+            fpmemento = shelve.open(memento_name)
+            self.saved_states = fpmemento[shelve_key2storage_memento_of_subject]
+
+            saved_state = self.saved_states[self.ID]
+            self.originator.restore_from_memento(saved_state)
+            user_id_index = self.originator.get_state()
+            logging.info("{}@{} loading memento got last user_id: {}".format(
+                type(self).__name__, self.ID, user_id_index))
+
+            user_id_index = self.user_ids.index(user_id_index) + 1
+            # rebuild user_ids
+            self.user_ids = self.user_ids[user_id_index:] + self.user_ids[:user_id_index]
+        except (KeyError, ValueError) as err:
+            # accept empty fpmemento
+            # accept notexist user_id, not change self.user_ids iteration
+            logging.warning(
+                "{}@{} loading memento: {}. do not set user_ids".format(
+                    type(self).__name__, self.ID, err))
+            logging.info("{}\n".format(self.user_ids))
+        finally:
+            fpmemento.close()
+
+        # setup observer
         # self.q_data = queue.Queue()
         self.q_monitor = Queue()  # [CSDN Customization]
-        for user_id in user_ids:
-            self.q_monitor.put(self._gen_url(user_id))
+        for user_id in self.user_ids:
+            self.q_monitor.put(user_id)
             # print("[Debug] q_monitor put: {}".format(self._gen_url(user_id)),
             #       file=sys.stderr)
-
-        self.__observers = set()
-        # self._
 
     def _gen_url(self, user_id):
         '''__url stracture:
@@ -149,6 +231,7 @@ class Subject(object):
         pass
 
     async def __monitor_update_asyncio_version(self):
+        global g_stop_signal, g_asyncio_subject_tasks_number
         #
         # do update
         #
@@ -158,12 +241,30 @@ class Subject(object):
         # monitor_url = self.__url  # [Orginal] xxx
 
         retry_time = 0
+        user_id = ''
         while True:
+            if g_stop_signal:
+                logging.info("{}@{} quit".format(type(self).__name__, self.ID))
+                break
             try:
                 browser = None
+                __start_time = datetime.now()
+                #
+                # memento
+                #
+                self.originator.set(user_id)
+                self.saved_states[self.ID] = self.originator.save_to_memento()
+
+                # save to disk  ################
+                fpmemento = shelve.open(memento_name)
+                fpmemento[shelve_key2storage_memento_of_subject] = self.saved_states
+                fpmemento.close()
+
                 # [CSDN Customization]: one object loop a grade user-ids
-                monitor_url = self.q_monitor.get()
-                self.q_monitor.put(monitor_url)  # put back to loop
+                user_id = self.q_monitor.get()
+                self.q_monitor.put(user_id)  # put back to loop
+
+                monitor_url = self._gen_url(user_id)
                 logging.info("monitor_url: {} to notifyAll.".format(monitor_url))
 
                 # [CSDN Customization]: not be used, currently
@@ -193,13 +294,15 @@ class Subject(object):
                     self.__release_browser_handler(browser)
                     del browser
 
+            ca = datetime.now() - __start_time
+            logging.info("{} cost time: {}s".format(self.ID, ca.seconds))
             #
             # use asyncio give out control
             #
             if retry_time == 0:
                 # -[o] to long  may could not work
                 # await asyncio.sleep(60 * 60 * 24)
-                await asyncio.sleep(60)  # test version of sleep time
+                await asyncio.sleep(ca.seconds * g_asyncio_subject_tasks_number)  # test version of sleep time
             else:  # after sleep retry time inteval, retry again
                 await asyncio.sleep(retry_time)
             # await asyncio.sleep(60)
@@ -275,6 +378,7 @@ class DB_Observer():
 # demo -[o] need update code
 #
 def main():
+    prog_init()
     #
     # run Resource in mange.py maybe if need.
     #
@@ -295,52 +399,65 @@ def main():
 
 
 def update_db():
-    # multi-subject(one grade user-ids one subject)
-    grades = []
-
     #
     # targets set by redis DB - user id list.
     # cnblogs_com.subject.r_cb <- redis_cnblogs
     # -[x] use from Redis
     # targets_grade = ["IAMTOM", "duoduotouhenying", ]
 
-    # 1592 currently
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 1, 2500, withscores=True)
-    targets_grade = [_[0].decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+    # memento ######################
+    def init_memento():
+        # originator = Originator()
+        # saved_states = {}
+        return Originator(), {}
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 2501, 5000, withscores=False)
-    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+    originator, saved_states = init_memento()
 
-    # 5001~10000 => 1408 currently
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 5001, 10000, withscores=False)
-    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+    def setup_subject(originator, saved_states):
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 10001, 20000, withscores=False) # 1408 currently
-    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+        def redis_rank_grade():
+            return [0, 2500, 5000, 10000, 20000, 50000, 100000]
+            # return [0, 2500]
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 20001, 80000, withscores=False) # 1554 currently
-    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+        # multi-subject(one grade user-ids one subject)
+        grades = redis_rank_grade()
+        _raw_redis_datas = [r_csdn.zrangebyscore("RANK", grades[i] + 1, grades[i + 1], withscores=False) for i in range(len(grades) - 1)]
+        # logging.info("update_db> setup_subject> _raw_redis_datas:", _raw_redis_datas)
 
-    subjs_targets = []
-    [subjs_targets.append(Subject(grade)) for grade in grades]
+        subject_targets = []
+        for idx, rawdata in enumerate(_raw_redis_datas):
+            subject_targets.append(
+                Subject(
+                    [_.decode('utf-8') for _ in rawdata],
+                    "index_{}".format(idx), originator, saved_states
+                ))
 
-    db_observer = DB_Observer()
+        return subject_targets
 
-    # register
-    [subj_t.register(db_observer) for subj_t in subjs_targets]
+    def software_logical(dbobserver, setup_subject, originator, saved_states):
+        subject_targets = setup_subject(originator, saved_states)
 
-    # build tasks
-    tasks = [subj_t.run_asyncio_version() for subj_t in subjs_targets]
+        # register
+        [_.register(dbobserver) for _ in subject_targets]
+        return subject_targets
 
-    loop = asyncio.get_event_loop()
-    # execute coroutine
-    loop.run_until_complete(asyncio.wait(tasks))
-    loop.close()
+    dbobserver = DB_Observer()
+    subject_targets = software_logical(dbobserver, setup_subject, originator, saved_states)
+
+    def run(subject_targets):
+        global g_asyncio_subject_tasks_number
+        # build tasks
+        tasks = [_.run_asyncio_version() for _ in subject_targets]
+
+        # fix some task have interval time issue
+        g_asyncio_subject_tasks_number = len(tasks)
+
+        loop = asyncio.get_event_loop()
+        # execute coroutine
+        loop.run_until_complete(asyncio.wait(tasks))
+        loop.close()
+
+    run(subject_targets)
 
 
 if __name__ == '__main__':

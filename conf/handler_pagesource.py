@@ -23,7 +23,7 @@ conf = Configuration(
     PIDFILE="/tmp/daemon.pid",
     # DEBUG_BROWSER=,
     LOG_PATH="/mnt/banq_16g/CSDN-Data/log/daemonize_use_threadpool/",
-    STD_FILE="20190120_0033.log",
+    STD_FILE="20190125_1902.log",
     NEGOTIATE_DOMAIN='', NEGOTIATE_PORT=50007,
     STATUS_DOMAIN='', STATUS_PORT=50008,
 )
