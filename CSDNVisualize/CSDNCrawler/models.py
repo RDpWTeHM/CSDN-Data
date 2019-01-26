@@ -35,7 +35,7 @@ class Article(models.Model):
     user_id = ForeignKey(UserID, on_delete=models.CASCADE)  # 注意 on_delete 的含义
     articleid = CharField(max_length=16)
     originality = BooleanField(default=True)
-    title = CharField(max_length=128, default="None")
+    title = CharField(max_length=512, default="None")
     pub_date = DateTimeField(
         'article date published',
         default=datetime(1970, 1, 1, 0, 0, 0))
