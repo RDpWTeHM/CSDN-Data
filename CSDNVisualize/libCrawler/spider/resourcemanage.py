@@ -162,6 +162,15 @@ class Resource(object):
             sleep(15)  # check every 10 seconds
             self.__do_check_timeout_consider_as_crash()
 
+    def handler_quit(self):
+        with self._browser_state_Lock:
+            while True:
+                try:
+                    browser = self.QBrowser.get(timeout=10)
+                    browser.quit()
+                except queue.Empty:
+                    break
+
     # browser = None
     # try:
     #     browser = r.acquire_browser_handler_by_create()

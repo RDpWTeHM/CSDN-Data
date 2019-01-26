@@ -395,12 +395,8 @@ if __name__ == '__main__':
         # Signal handler for termination (required)
         def sigterm_handler(signo, frame):
             ''' 如果要退出程序，清除 robot browsers'''
-            while True:
-                try:
-                    browser = browserQ.get(timeout=3)
-                    browser.quit()
-                except queue.Empty:
-                    break
+            res = Resource()
+            res.handler_quit()
 
             stop_and_free_thread_pool()
             # show_all_results()   # show_all_errors()
@@ -416,7 +412,8 @@ if __name__ == '__main__':
 
         # make sure parent-> chile processing exit
         ppid = os.getppid()
-        os.system("kill -15 {}".format(ppid))
+        if ppid != 1:
+            os.system("kill -15 {}".format(ppid))
 
         main(len(sys.argv), sys.argv)
 

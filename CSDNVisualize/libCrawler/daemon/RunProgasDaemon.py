@@ -45,7 +45,7 @@ def daemonize(pidfile, *, stdin='/dev/null',
     except OSError as e:
         raise RuntimeError('fork #1 failed.')
 
-    time.sleep(1)  # wait parent exit
+    time.sleep(0.5)  # wait parent exit
 
     os.chdir('/')
     os.umask(0)
@@ -53,19 +53,23 @@ def daemonize(pidfile, *, stdin='/dev/null',
     # Second fork (relinquish session leadership)
     try:
         if os.fork() > 0:
-            print("I am child, why i don't quit?")
-            # raise SystemExit(0)
-            sys.exit(0)
+            # print("I am child, why i don't quit?")
+            raise SystemExit(0)
+            # sys.exit(0)
             print("I realy dosen't quit")
     except OSError as e:
         raise RuntimeError('fork #2 failed.')
 
     # wait child exit
-    time.sleep(2)
+    time.sleep(1)
     ppid = os.getppid()
-    os.system("echo 'ppid is: {}' > /dev/pts/1".format(ppid))
+    # os.system("echo 'ppid is: {}' > /dev/pts/1".format(ppid))
     # if str(ppid) in os.popen("ps | grep {} | grep -v 'grep'".format(ppid)).read():
     #     raise RuntimeError("parent> 'chile' processing dose not quit!")
+    if ppid != 1:
+        print("child not quit!!!")
+        os.system("kill -15 {}".format(ppid))
+        time.sleep(1)
 
     # Flush I/O buffers
     sys.stdout.flush()

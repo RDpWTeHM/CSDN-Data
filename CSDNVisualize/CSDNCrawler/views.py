@@ -111,17 +111,20 @@ def startcrawler(request):
     if doDebug:
         print("userid: ", userid, file=sys.stderr)
 
-    cst_tz = pytz.timezone('Asia/Shanghai')
-    utc_tz = pytz.timezone('UTC')
-    time_now = datetime.now().replace(tzinfo=cst_tz).astimezone(utc_tz)
-    time_lastcrawl = userid.visualdata_set.all().last().crawlerDate
-    dalt_day = EasyDeltaDatetime(time_now, time_lastcrawl).day
-    if doDebug:
-        print("time_now: ", time_now, file=sys.stderr)
-        print("time_lastcrawl: ", time_lastcrawl, file=sys.stderr)
-        print("dalt_day: {}".format(dalt_day), file=sys.stderr)
-    if dalt_day < 1:
-        return HttpResponse("<h1>Crawled less than 1 day</h1>")
+    try:
+        cst_tz = pytz.timezone('Asia/Shanghai')
+        utc_tz = pytz.timezone('UTC')
+        time_now = datetime.now().replace(tzinfo=cst_tz).astimezone(utc_tz)
+        time_lastcrawl = userid.visualdata_set.all().last().crawlerDate
+        dalt_day = EasyDeltaDatetime(time_now, time_lastcrawl).day
+        if doDebug:
+            print("time_now: ", time_now, file=sys.stderr)
+            print("time_lastcrawl: ", time_lastcrawl, file=sys.stderr)
+            print("dalt_day: {}".format(dalt_day), file=sys.stderr)
+        if dalt_day < 1:
+            return HttpResponse("<h1>Crawled less than 1 day</h1>")
+    except AttributeError:
+        pass  # 'NoneType' object has no attribute 'crawlerDate'
 
     newVisualData = VisualData()
 
