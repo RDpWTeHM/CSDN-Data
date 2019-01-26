@@ -25,6 +25,7 @@ Usage:
 
 import os
 import sys
+import time
 
 import atexit
 import signal
@@ -39,9 +40,12 @@ def daemonize(pidfile, *, stdin='/dev/null',
     # First fork (detaches from parent)
     try:
         if os.fork() > 0:
-            raise SystemExit(0)   # Parent exit
+            # raise SystemExit(0)   # Parent exit
+            sys.exit(0)
     except OSError as e:
         raise RuntimeError('fork #1 failed.')
+
+    time.sleep(0.5)  # wait parent exit
 
     os.chdir('/')
     os.umask(0)
@@ -49,9 +53,23 @@ def daemonize(pidfile, *, stdin='/dev/null',
     # Second fork (relinquish session leadership)
     try:
         if os.fork() > 0:
+            # print("I am child, why i don't quit?")
             raise SystemExit(0)
+            # sys.exit(0)
+            print("I realy dosen't quit")
     except OSError as e:
         raise RuntimeError('fork #2 failed.')
+
+    # wait child exit
+    time.sleep(1)
+    ppid = os.getppid()
+    # os.system("echo 'ppid is: {}' > /dev/pts/1".format(ppid))
+    # if str(ppid) in os.popen("ps | grep {} | grep -v 'grep'".format(ppid)).read():
+    #     raise RuntimeError("parent> 'chile' processing dose not quit!")
+    if ppid != 1:
+        print("child not quit!!!")
+        os.system("kill -15 {}".format(ppid))
+        time.sleep(1)
 
     # Flush I/O buffers
     sys.stdout.flush()
@@ -70,10 +88,10 @@ def daemonize(pidfile, *, stdin='/dev/null',
         print(os.getpid(),file=f)
 
 
-DJANGO_PROJ_PATH = "/home/joseph/Devl/SVN/myGit/Gitee/Practice/daemon/test/create4test/"
-DJANGO_PROJ_ARGV = " runserver 0.0.0.0:8000 "
-DJANGO_PROJ_LOG  = "/tmp/django_proj_create4test.log"
-SHELL_ARGV = " > {} 2>&1 & ".format(DJANGO_PROJ_LOG)
+# DJANGO_PROJ_PATH = "/home/joseph/Devl/SVN/myGit/Gitee/Practice/daemon/test/create4test/"
+# DJANGO_PROJ_ARGV = " runserver 0.0.0.0:8000 "
+# DJANGO_PROJ_LOG  = "/tmp/django_proj_create4test.log"
+# SHELL_ARGV = " > {} 2>&1 & ".format(DJANGO_PROJ_LOG)
 
 
 def start_djangoTest():

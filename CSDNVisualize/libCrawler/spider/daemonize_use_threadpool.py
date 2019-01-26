@@ -364,30 +364,6 @@ if __name__ == '__main__':
         t.start()
         del t
 
-        def _debug_startBrowser(i):
-            capa = DesiredCapabilities().CHROME
-            capa["pageLoadStrategy"] = "none"
-            # capa["pageLoadStrategy"] = 'eager'
-            from selenium.webdriver.chrome.options import Options
-            croptions = Options()
-            # croptions.headless = True
-            croptions.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Geoko) Chrome/70.0.3538.102 Safari/537.36")
-
-            browser = webdriver.Chrome(
-                executable_path="/usr/lib/chromium-browser/chromedriver",
-                desired_capabilities=capa,
-                chrome_options=croptions, )
-            time.sleep(1)
-            x = 0 if (-1) ** int(i + 1 / 2) == 1 else 1  # 奇数 (-1)^0=1
-            y = 0 if (-1) ** int(i / 2) == 1 else 1    # 偶数 -1^0=1
-            print("640*x = {}".format(640 * x))
-            print("\t512*y = {}\n".format(512 * y))
-            browser.set_window_size(480, 480)  # not work well
-            browser.set_window_position(
-                320 * x * 20, 320 * y * 20)  # *100 是临时手动适配！
-            browserQ.put(browser)
-            del browser
-
         #
         # daemonize
         #
@@ -401,6 +377,7 @@ if __name__ == '__main__':
         except RuntimeError as e:
             print(e, file=sys.stderr)
             raise SystemExit(1)
+            # sys.exit(1)
 
         #
         # logging
@@ -418,12 +395,8 @@ if __name__ == '__main__':
         # Signal handler for termination (required)
         def sigterm_handler(signo, frame):
             ''' 如果要退出程序，清除 robot browsers'''
-            while True:
-                try:
-                    browser = browserQ.get(timeout=3)
-                    browser.quit()
-                except queue.Empty:
-                    break
+            res = Resource()
+            res.handler_quit()
 
             stop_and_free_thread_pool()
             # show_all_results()   # show_all_errors()
@@ -436,6 +409,11 @@ if __name__ == '__main__':
             '''this kind start solution could work!'''
             os.system("{}manage.py {} {}".format(
                 DJANGO_PROJ_PATH, DJANGO_PROJ_ARGV, SHELL_ARGV))
+
+        # make sure parent-> chile processing exit
+        ppid = os.getppid()
+        if ppid != 1:
+            os.system("kill -15 {}".format(ppid))
 
         main(len(sys.argv), sys.argv)
 

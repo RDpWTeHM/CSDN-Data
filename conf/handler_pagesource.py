@@ -22,8 +22,8 @@ conf = Configuration(
     MAX_BROWSER_RUN=2,
     PIDFILE="/tmp/daemon.pid",
     # DEBUG_BROWSER=,
-    LOG_PATH="/mnt/banq_16g/CSDN-Data/log/daemonize_use_threadpool/",
-    STD_FILE="20190125_1902.log",
+    LOG_PATH="/tmp/",
+    STD_FILE="daemonize_use_threadpool_20190126_2245.log",
     NEGOTIATE_DOMAIN='', NEGOTIATE_PORT=50007,
     STATUS_DOMAIN='', STATUS_PORT=50008,
 )
