@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""subject.py
-
-N/A
-"""
 
 import redis
 import sys
 import os
 import time
 import asyncio
+import signal
 
 
 from time import sleep
@@ -17,7 +14,8 @@ from datetime import datetime
 # from datetime import timedelta
 
 # from threading import Thread
-import threading
+# import threading
+import shelve
 from queue import Queue
 import requests
 import logging
@@ -31,7 +29,7 @@ import conf.client_active_daemon
 CONF = conf.client_active_daemon.conf
 
 logging.basicConfig(
-    filename=CONF.LOGGING_FILE,
+    # filename=CONF.LOGGING_FILE,
     level=logging.INFO,
     # level=logging.DEBUG,
     format='[%(asctime)s]%(levelname)-9s%(message)s',
@@ -70,10 +68,65 @@ except (RuntimeError, Exception):
     sys.exit(1)  # check redis DB fail
 
 
+###################################################
+# save status for stop/restart || memonto pattern #
+###################################################
+memento_name = ".memento"
+shelve_key2storage_memento_of_subject = 'subjects'
+
+
+class Memento(object):
+    def __init__(self, state):
+        self._state = state
+
+    def get_saved_state(self):
+        return self._state
+
+
+class Originator(object):
+    _state = None
+
+    def set(self, state):
+        logging.debug(
+            "Originator@{}: Setting state to {}".format(id(self), state))
+        self._state = state
+
+    def save_to_memento(self, state=None):
+        logging.debug("Originator@{}: Saving to Memento.".format(id(self)))
+        if state:
+            self.set(state)
+        self.memento = Memento(self._state)
+        return self.memento
+
+    def get_memento(self):
+        return self.memento
+
+    def restore_from_memento(self, memento):
+        self._state = memento.get_saved_state()
+        logging.info(
+            "Originator@{}: State after restoring from Memento: {}".format(
+                id(self), self._state))
+        return self._state
+
+    def get_state(self):
+        return self._state
+
+
 #
 # utility
 #
-# gen_url = lambda _id: "https://me.csdn.net/{!s}".format(_id)
+g_stop_signal = False  # asycio loop
+g_asyncio_subject_tasks_number = 0
+
+
+def sigint_handler(signo, frame):
+    ''' end game'''
+    global g_stop_signal
+    g_stop_signal = True
+
+
+def prog_init():
+    signal.signal(signal.SIGINT, sigint_handler)
 
 
 class CrawlError(Exception):
@@ -94,7 +147,7 @@ class Subject(object):
       -[o] need update package reference
     '''
 
-    def __init__(self, user_ids):
+    def __init__(self, user_ids, ID, ):
         '''__init__
           length of user_ids => 60s x 60m x 24h
           one user_id except 10s, but wait 60s, 1x10x24 => 240
@@ -103,15 +156,45 @@ class Subject(object):
         # self.__url = gen_url(user_id)
         self.user_information = None
         self.user_article = None
+
+        # Observer ####################
+        self.__observers = set()
+
+        # memento #####################
+        self.ID = ID
+        self.originator = Originator()
+
+        # memento + observer ##########
+        # loading memento
+        try:
+            fpmemento = shelve.open(memento_name)
+            self.db_saved_states = fpmemento[shelve_key2storage_memento_of_subject]
+
+            saved_state = self.db_saved_states[self.ID]
+            user_id_index = self.originator.restore_from_memento(saved_state)
+            logging.info("{}@{} loading memento got last user_id: {}".format(
+                type(self).__name__, self.ID, user_id_index))
+
+            user_id_index = self.user_ids.index(user_id_index) + 1
+            # rebuild user_ids
+            self.user_ids = self.user_ids[user_id_index:] + self.user_ids[:user_id_index]
+        except (KeyError, ValueError) as err:
+            # accept empty fpmemento
+            # accept notexist user_id, not change self.user_ids iteration
+            logging.warning(
+                "{}@{} loading memento: {}. do not set user_ids".format(
+                    type(self).__name__, self.ID, err))
+            logging.info("{}\n".format(self.user_ids))
+        finally:
+            fpmemento.close()
+
+        # setup observer ############
         # self.q_data = queue.Queue()
         self.q_monitor = Queue()  # [CSDN Customization]
-        for user_id in user_ids:
-            self.q_monitor.put(self._gen_url(user_id))
+        for user_id in self.user_ids:
+            self.q_monitor.put(user_id)
             # print("[Debug] q_monitor put: {}".format(self._gen_url(user_id)),
             #       file=sys.stderr)
-
-        self.__observers = set()
-        # self._
 
     def _gen_url(self, user_id):
         '''__url stracture:
@@ -153,6 +236,7 @@ class Subject(object):
         pass
 
     async def __monitor_update_asyncio_version(self):
+        global g_stop_signal, g_asyncio_subject_tasks_number
         #
         # do update
         #
@@ -162,51 +246,69 @@ class Subject(object):
         # monitor_url = self.__url  # [Orginal] xxx
 
         retry_time = 0
+        user_id = ''
         while True:
-            try:
-                browser = None
-                # [CSDN Customization]: one object loop a grade user-ids
-                monitor_url = self.q_monitor.get()
-                self.q_monitor.put(monitor_url)  # put back to loop
-                logging.info("monitor_url: {} to notifyAll.".format(monitor_url))
+            # memento  ##################
+            self.originator.set(user_id)
 
-                # [CSDN Customization]: not be used, currently
-                browser = self.__acquire_browser_handler()
-                # browser.get(monitor_url)  # set browser with cacp - "none" \/
-                # time.sleep(20)  # -[o] wait browser excute, update later
+            # for quit program  #########
+            if g_stop_signal:
+                logging.info("{}@{} quit".format(type(self).__name__, self.ID))
+                break
 
-                # user_information = self.__parse_information(browser)
-                data = {"requests": monitor_url}
-                user_information = self.__parse_information(data)
-                self.notifyAll(user_information)  # notifyAll django-crawl-url
+            __start_time = datetime.now()
+            user_id, retry_time = self.do_it(retry_time)
+            difference = datetime.now() - __start_time
+            logging.info(
+                "{} cost time: {}s".format(self.ID, difference.seconds))
 
-                # user_article = self.__parse_artical(browser)
-                # self.notifyAll(user_article)
-
-            except BrowserAcquireCrawlError as err:
-                logging.error("Subject> __monitor_update> ", err)
-                raise StopIteration(err)
-            except Exception as err:
-                logging.critical("Subject> __monitor_update> ", err)
-                retry_time += 60
-            else:
-                retry_time = 0
-            finally:
-                # [CSDN Customization]: not be used
-                if browser:
-                    self.__release_browser_handler(browser)
-                    del browser
-
-            #
-            # use asyncio give out control
-            #
+            # use asyncio give out control  ##########
             if retry_time == 0:
                 # -[o] to long  may could not work
                 # await asyncio.sleep(60 * 60 * 24)
-                await asyncio.sleep(60)  # test version of sleep time
+                await asyncio.sleep(
+                    difference.seconds * g_asyncio_subject_tasks_number + 10
+                )  # test version of sleep time
             else:  # after sleep retry time inteval, retry again
                 await asyncio.sleep(retry_time)
             # await asyncio.sleep(60)
+
+    def do_it(self, retry_time):
+        try:
+            browser = None
+            # [CSDN Customization]: one object loop a grade user-ids
+            user_id = self.q_monitor.get()
+            self.q_monitor.put(user_id)  # put back to loop
+
+            monitor_url = self._gen_url(user_id)
+            logging.info("monitor_url: {} to notifyAll.".format(monitor_url))
+
+            # [CSDN Customization]: not be used, currently
+            browser = self.__acquire_browser_handler()
+            # browser.get(monitor_url)  # set browser with cacp - "none" \/
+            # time.sleep(20)  # -[o] wait browser excute, update later
+
+            # user_information = self.__parse_information(browser)
+            data = {"requests": monitor_url}
+            user_information = self.__parse_information(data)
+            self.notifyAll(user_information)  # notifyAll django-crawl-url
+
+            # user_article = self.__parse_artical(browser)
+            # self.notifyAll(user_article)
+        except BrowserAcquireCrawlError as err:
+            logging.error("Subject> __monitor_update> ", err)
+            raise StopIteration(err)
+        except Exception as err:
+            logging.critical("Subject> __monitor_update> ", err)
+            retry_time += 60
+        else:
+            retry_time = 0
+        finally:
+            # [CSDN Customization]: not be used
+            if browser:
+                self.__release_browser_handler(browser)
+                del browser
+        return user_id, retry_time
 
     def __parse_information(self, _browser_handler):
         # return {"user_id": self.user_id, "test": True}
@@ -279,6 +381,7 @@ class DB_Observer():
 # demo -[o] need update code
 #
 def main():
+    prog_init()
     #
     # run Resource in mange.py maybe if need.
     #
@@ -296,44 +399,71 @@ def main():
     #  run, this program twice by mistake,
     #  -[o] fix this issue!
     update_db()
+    logging.info("\n====== Program exit! ======")
 
 
 def update_db():
-    # multi-subject(one grade user-ids one subject)
-    grades = []
-
     #
     # targets set by redis DB - user id list.
     # cnblogs_com.subject.r_cb <- redis_cnblogs
     # -[x] use from Redis
     # targets_grade = ["IAMTOM", "duoduotouhenying", ]
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 598, 5000, withscores=True)  # 1592 currently
-    targets_grade = [_[0].decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 7577, 20000, withscores=False) # 1408 currently
-    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+    # memento ######################
+    saved_states = {}
 
-    _raw_radis_data = r_csdn.zrangebyscore("RANK", 28807, 80000, withscores=False) # 1554 currently
-    targets_grade = [_.decode('utf-8') for _ in _raw_radis_data]
-    grades.append(targets_grade)
+    def setup_subject():
 
-    subjs_targets = []
-    [subjs_targets.append(Subject(grade)) for grade in grades]
+        def redis_rank_grade():
+            return [0, 2500, 5000, 10000, 20000, 50000, 100000]
+            # return [0, 2500]
 
-    db_observer = DB_Observer()
+        # multi-subject(one grade user-ids one subject)
+        grades = redis_rank_grade()
+        _raw_redis_datas = [r_csdn.zrangebyscore("RANK", grades[i] + 1, grades[i + 1], withscores=False) for i in range(len(grades) - 1)]
+        # logging.info("update_db> setup_subject> _raw_redis_datas:", _raw_redis_datas)
 
-    # register
-    [subj_t.register(db_observer) for subj_t in subjs_targets]
+        subjects = []
+        for idx, rawdata in enumerate(_raw_redis_datas):
+            subjects.append(
+                Subject([_.decode('utf-8') for _ in rawdata],
+                        "index_{}".format(idx), ))
 
-    # build tasks
-    tasks = [subj_t.run_asyncio_version() for subj_t in subjs_targets]
+        return subjects
 
-    loop = asyncio.get_event_loop()
-    # execute coroutine
-    loop.run_until_complete(asyncio.wait(tasks))
-    loop.close()
+    def software_logical(dbobserver, setup_subject):
+        subject_targets = setup_subject()
+
+        # register
+        [_.register(dbobserver) for _ in subject_targets]
+        return subject_targets
+
+    dbobserver = DB_Observer()
+    subjects = software_logical(dbobserver, setup_subject)
+
+    def run(subject_targets):
+        global g_asyncio_subject_tasks_number
+        # build tasks
+        tasks = [_.run_asyncio_version() for _ in subject_targets]
+
+        # fix some task have interval time issue
+        g_asyncio_subject_tasks_number = len(tasks)
+
+        loop = asyncio.get_event_loop()
+        # execute coroutine
+        loop.run_until_complete(asyncio.wait(tasks))
+        loop.close()
+
+    run(subjects)
+
+    # collect mementos  ############
+    for subject in subjects:
+        saved_states[subject.ID] = subject.originator.save_to_memento()
+
+    # save to disk  ################
+    fpmemento = shelve.open(memento_name)
+    fpmemento[shelve_key2storage_memento_of_subject] = saved_states
+    fpmemento.close()
 
 
 if __name__ == '__main__':

@@ -205,7 +205,7 @@ class TestLibDBFollow(unittest.TestCase):
         self.assertTrue(set(data.items()).issubset(set(json.loads(text).items())))
 
 
-# @unittest.skip("be test already")
+@unittest.skip("be test already")
 class TestLibDBFans(unittest.TestCase):
     from . import DBFans
     data = {
