@@ -58,6 +58,11 @@ def save_all_follows_of_new_userid_to_shelve(user_id, db_path):
 
 import pytz
 # from django.until import timezone
+
+
+#
+# utils
+#
 def covert2DjangoDateTime(_strPub_date):
     # pub_data format: '2018-10-31 10:13:25'
     # defualt datetime(1970, 1, 1, 0, 0, 0)
@@ -69,6 +74,24 @@ def covert2DjangoDateTime(_strPub_date):
                     tzinfo=pytz.timezone('Asia/Shanghai'))
 
 
+class EasyDeltaDatetime():
+    from datetime import datetime
+
+    def __init__(self, dstDatetime, srcDatetime):
+        self.dstDatetime = dstDatetime
+        self.srcDatetime = srcDatetime
+        self.computer_zero_datetime = datetime(1970, 1, 1, 0, 0, 0)
+        self.calculate()
+
+    def calculate(self):
+        self.difference = self.dstDatetime - self.srcDatetime
+        self.meta_datetime = self.computer_zero_datetime + self.difference
+
+    def __getattr__(self, attrname):
+        if attrname in ["year", "month", "day", "hour", "minute", "second"]:
+            return int(getattr(self.meta_datetime, attrname) - getattr(self.computer_zero_datetime, attrname))
+
+
 def startcrawler(request):
     # do the crawler action
     try:
@@ -76,7 +99,7 @@ def startcrawler(request):
     except KeyError:
         print("WARNING: no 'user_id' in Request, crawler myself information!",
               file=sys.stderr)
-        USER_ID = "qq_29757283"
+        raise Http404("error request format!")
 
     # -[o] joseph, 爬虫失败的情况这里没有考虑。
     try:
@@ -86,7 +109,19 @@ def startcrawler(request):
         # save_all_follows_of_new_userid_to_shelve(
         #     USER_ID, "/mnt/sandi_TF/Plateform/database/follows_shelve/")
     if doDebug:
-        print("userid: ", userid)
+        print("userid: ", userid, file=sys.stderr)
+
+    cst_tz = pytz.timezone('Asia/Shanghai')
+    utc_tz = pytz.timezone('UTC')
+    time_now = datetime.now().replace(tzinfo=cst_tz).astimezone(utc_tz)
+    time_lastcrawl = userid.visualdata_set.all().last().crawlerDate
+    dalt_day = EasyDeltaDatetime(time_now, time_lastcrawl).day
+    if doDebug:
+        print("time_now: ", time_now, file=sys.stderr)
+        print("time_lastcrawl: ", time_lastcrawl, file=sys.stderr)
+        print("dalt_day: {}".format(dalt_day), file=sys.stderr)
+    if dalt_day < 1:
+        return HttpResponse("<h1>Crawled less than 1 day</h1>")
 
     newVisualData = VisualData()
 
