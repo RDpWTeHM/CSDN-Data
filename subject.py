@@ -91,23 +91,30 @@ class Originator(object):
             "Originator@{}: Setting state to {}".format(id(self), state))
         self._state = state
 
-    def save_to_memento(self):
+    def save_to_memento(self, state=None):
         logging.debug("Originator@{}: Saving to Memento.".format(id(self)))
-        return Memento(self._state)
+        if state:
+            self.set(state)
+        self.memento = Memento(self._state)
+        return self.memento
+
+    def get_memento(self):
+        return self.memento
 
     def restore_from_memento(self, memento):
         self._state = memento.get_saved_state()
         logging.info(
             "Originator@{}: State after restoring from Memento: {}".format(
                 id(self), self._state))
+        return self._state
 
     def get_state(self):
         return self._state
 
+
 #
 # utility
 #
-# gen_url = lambda _id: "https://me.csdn.net/{!s}".format(_id)
 g_stop_signal = False  # asycio loop
 g_asyncio_subject_tasks_number = 0
 
@@ -140,7 +147,7 @@ class Subject(object):
       -[o] need update package reference
     '''
 
-    def __init__(self, user_ids, ID, originator, saved_states):
+    def __init__(self, user_ids, ID, ):
         '''__init__
           length of user_ids => 60s x 60m x 24h
           one user_id except 10s, but wait 60s, 1x10x24 => 240
@@ -155,18 +162,16 @@ class Subject(object):
 
         # memento #####################
         self.ID = ID
-        self.originator = originator
-        self.saved_states = saved_states
+        self.originator = Originator()
 
         # memento + observer ##########
         # loading memento
         try:
             fpmemento = shelve.open(memento_name)
-            self.saved_states = fpmemento[shelve_key2storage_memento_of_subject]
+            self.db_saved_states = fpmemento[shelve_key2storage_memento_of_subject]
 
-            saved_state = self.saved_states[self.ID]
-            self.originator.restore_from_memento(saved_state)
-            user_id_index = self.originator.get_state()
+            saved_state = self.db_saved_states[self.ID]
+            user_id_index = self.originator.restore_from_memento(saved_state)
             logging.info("{}@{} loading memento got last user_id: {}".format(
                 type(self).__name__, self.ID, user_id_index))
 
@@ -183,7 +188,7 @@ class Subject(object):
         finally:
             fpmemento.close()
 
-        # setup observer
+        # setup observer ############
         # self.q_data = queue.Queue()
         self.q_monitor = Queue()  # [CSDN Customization]
         for user_id in self.user_ids:
@@ -243,69 +248,67 @@ class Subject(object):
         retry_time = 0
         user_id = ''
         while True:
+            # memento  ##################
+            self.originator.set(user_id)
+
+            # for quit program  #########
             if g_stop_signal:
                 logging.info("{}@{} quit".format(type(self).__name__, self.ID))
                 break
-            try:
-                browser = None
-                __start_time = datetime.now()
-                #
-                # memento
-                #
-                self.originator.set(user_id)
-                self.saved_states[self.ID] = self.originator.save_to_memento()
 
-                # save to disk  ################
-                fpmemento = shelve.open(memento_name)
-                fpmemento[shelve_key2storage_memento_of_subject] = self.saved_states
-                fpmemento.close()
+            __start_time = datetime.now()
+            user_id, retry_time = self.do_it(retry_time)
+            difference = datetime.now() - __start_time
+            logging.info(
+                "{} cost time: {}s".format(self.ID, difference.seconds))
 
-                # [CSDN Customization]: one object loop a grade user-ids
-                user_id = self.q_monitor.get()
-                self.q_monitor.put(user_id)  # put back to loop
-
-                monitor_url = self._gen_url(user_id)
-                logging.info("monitor_url: {} to notifyAll.".format(monitor_url))
-
-                # [CSDN Customization]: not be used, currently
-                browser = self.__acquire_browser_handler()
-                # browser.get(monitor_url)  # set browser with cacp - "none" \/
-                # time.sleep(20)  # -[o] wait browser excute, update later
-
-                # user_information = self.__parse_information(browser)
-                data = {"requests": monitor_url}
-                user_information = self.__parse_information(data)
-                self.notifyAll(user_information)  # notifyAll django-crawl-url
-
-                # user_article = self.__parse_artical(browser)
-                # self.notifyAll(user_article)
-
-            except BrowserAcquireCrawlError as err:
-                logging.error("Subject> __monitor_update> ", err)
-                raise StopIteration(err)
-            except Exception as err:
-                logging.critical("Subject> __monitor_update> ", err)
-                retry_time += 60
-            else:
-                retry_time = 0
-            finally:
-                # [CSDN Customization]: not be used
-                if browser:
-                    self.__release_browser_handler(browser)
-                    del browser
-
-            ca = datetime.now() - __start_time
-            logging.info("{} cost time: {}s".format(self.ID, ca.seconds))
-            #
-            # use asyncio give out control
-            #
+            # use asyncio give out control  ##########
             if retry_time == 0:
                 # -[o] to long  may could not work
                 # await asyncio.sleep(60 * 60 * 24)
-                await asyncio.sleep(ca.seconds * g_asyncio_subject_tasks_number)  # test version of sleep time
+                await asyncio.sleep(
+                    difference.seconds * g_asyncio_subject_tasks_number + 10
+                )  # test version of sleep time
             else:  # after sleep retry time inteval, retry again
                 await asyncio.sleep(retry_time)
             # await asyncio.sleep(60)
+
+    def do_it(self, retry_time):
+        try:
+            browser = None
+            # [CSDN Customization]: one object loop a grade user-ids
+            user_id = self.q_monitor.get()
+            self.q_monitor.put(user_id)  # put back to loop
+
+            monitor_url = self._gen_url(user_id)
+            logging.info("monitor_url: {} to notifyAll.".format(monitor_url))
+
+            # [CSDN Customization]: not be used, currently
+            browser = self.__acquire_browser_handler()
+            # browser.get(monitor_url)  # set browser with cacp - "none" \/
+            # time.sleep(20)  # -[o] wait browser excute, update later
+
+            # user_information = self.__parse_information(browser)
+            data = {"requests": monitor_url}
+            user_information = self.__parse_information(data)
+            self.notifyAll(user_information)  # notifyAll django-crawl-url
+
+            # user_article = self.__parse_artical(browser)
+            # self.notifyAll(user_article)
+        except BrowserAcquireCrawlError as err:
+            logging.error("Subject> __monitor_update> ", err)
+            raise StopIteration(err)
+        except Exception as err:
+            logging.critical("Subject> __monitor_update> ", err)
+            retry_time += 60
+        else:
+            retry_time = 0
+        finally:
+            # [CSDN Customization]: not be used
+            if browser:
+                self.__release_browser_handler(browser)
+                del browser
+        return user_id, retry_time
 
     def __parse_information(self, _browser_handler):
         # return {"user_id": self.user_id, "test": True}
@@ -396,6 +399,7 @@ def main():
     #  run, this program twice by mistake,
     #  -[o] fix this issue!
     update_db()
+    logging.info("\n====== Program exit! ======")
 
 
 def update_db():
@@ -406,14 +410,9 @@ def update_db():
     # targets_grade = ["IAMTOM", "duoduotouhenying", ]
 
     # memento ######################
-    def init_memento():
-        # originator = Originator()
-        # saved_states = {}
-        return Originator(), {}
+    saved_states = {}
 
-    originator, saved_states = init_memento()
-
-    def setup_subject(originator, saved_states):
+    def setup_subject():
 
         def redis_rank_grade():
             return [0, 2500, 5000, 10000, 20000, 50000, 100000]
@@ -424,25 +423,23 @@ def update_db():
         _raw_redis_datas = [r_csdn.zrangebyscore("RANK", grades[i] + 1, grades[i + 1], withscores=False) for i in range(len(grades) - 1)]
         # logging.info("update_db> setup_subject> _raw_redis_datas:", _raw_redis_datas)
 
-        subject_targets = []
+        subjects = []
         for idx, rawdata in enumerate(_raw_redis_datas):
-            subject_targets.append(
-                Subject(
-                    [_.decode('utf-8') for _ in rawdata],
-                    "index_{}".format(idx), originator, saved_states
-                ))
+            subjects.append(
+                Subject([_.decode('utf-8') for _ in rawdata],
+                        "index_{}".format(idx), ))
 
-        return subject_targets
+        return subjects
 
-    def software_logical(dbobserver, setup_subject, originator, saved_states):
-        subject_targets = setup_subject(originator, saved_states)
+    def software_logical(dbobserver, setup_subject):
+        subject_targets = setup_subject()
 
         # register
         [_.register(dbobserver) for _ in subject_targets]
         return subject_targets
 
     dbobserver = DB_Observer()
-    subject_targets = software_logical(dbobserver, setup_subject, originator, saved_states)
+    subjects = software_logical(dbobserver, setup_subject)
 
     def run(subject_targets):
         global g_asyncio_subject_tasks_number
@@ -457,7 +454,16 @@ def update_db():
         loop.run_until_complete(asyncio.wait(tasks))
         loop.close()
 
-    run(subject_targets)
+    run(subjects)
+
+    # collect mementos  ############
+    for subject in subjects:
+        saved_states[subject.ID] = subject.originator.save_to_memento()
+
+    # save to disk  ################
+    fpmemento = shelve.open(memento_name)
+    fpmemento[shelve_key2storage_memento_of_subject] = saved_states
+    fpmemento.close()
 
 
 if __name__ == '__main__':
