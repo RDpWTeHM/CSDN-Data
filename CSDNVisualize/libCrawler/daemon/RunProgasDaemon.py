@@ -30,9 +30,11 @@ import time
 import atexit
 import signal
 
-def daemonize(pidfile, *, stdin='/dev/null',
-                          stdout='/dev/null',
-                          stderr='/dev/null'):
+
+def daemonize(pidfile, *,
+              stdin='/dev/null',
+              stdout='/dev/null',
+              stderr='/dev/null'):
 
     if os.path.exists(pidfile):
         raise RuntimeError('Already running')
@@ -40,37 +42,82 @@ def daemonize(pidfile, *, stdin='/dev/null',
     # First fork (detaches from parent)
     try:
         if os.fork() > 0:
+            print("Parent pid: {}".format(os.getpid()))
             # raise SystemExit(0)   # Parent exit
             sys.exit(0)
     except OSError as e:
         raise RuntimeError('fork #1 failed.')
 
-    time.sleep(0.5)  # wait parent exit
+    # wait parent exit ##############################
+    CNT = 10
+    pidof_systemd = int(os.popen("pidof systemd").read())
+    while CNT > 0:
+        ppid = os.getppid()
+        if ppid not in (1, pidof_systemd):
+            time.sleep(0.5)  # wait parent exit
+            CNT -= 1
+        else: break
+    if os.getppid() not in (1, pidof_systemd):
+        raise RuntimeError("fail to quit parent!")
 
-    os.chdir('/')
+    with open("daemonize.log", 'a') as daemonize_log:
+        print("[{}][debug child] pidof systemd: {}; pid: {}; ppid: {}\n".format(
+            time.ctime(), pidof_systemd, os.getpid(), ppid), file=daemonize_log)
+
+    # sys.stderr.write("\n[{}][debug child] pidof systemd: {}; pid: {}; ppid: {}\n".format(
+        # time.ctime(), pidof_systemd, os.getpid(), ppid))
+
+    # child work ###################################
+    # os.chdir('/tmp')
     os.umask(0)
     os.setsid()
     # Second fork (relinquish session leadership)
     try:
         if os.fork() > 0:
             # print("I am child, why i don't quit?")
-            raise SystemExit(0)
-            # sys.exit(0)
-            print("I realy dosen't quit")
+            # raise SystemExit(0)
+            sys.exit(0)
+            os.system("echo 'I realy dose not quit' >> /tmp/daemonize.log")
     except OSError as e:
         raise RuntimeError('fork #2 failed.')
 
-    # wait child exit
-    time.sleep(1)
+    # wait child exit #############################
     ppid = os.getppid()
-    # os.system("echo 'ppid is: {}' > /dev/pts/1".format(ppid))
+    # with open("/tmp/daemonize.log", 'w') as fp:
+        # print("ppid is: {}".format(ppid), file=fp)
     # if str(ppid) in os.popen("ps | grep {} | grep -v 'grep'".format(ppid)).read():
     #     raise RuntimeError("parent> 'chile' processing dose not quit!")
-    if ppid != 1:
-        print("child not quit!!!")
-        os.system("kill -15 {}".format(ppid))
-        time.sleep(1)
 
+    with open("daemonize.log", 'a') as daemonize_log:
+        print("[{}][grandson wait] pidof systemd: {}; pid: {}; ppid: {}\n".format(
+            time.ctime(), pidof_systemd, os.getpid(), ppid), file=daemonize_log)
+    CNT = 10
+    pidof_systemd = int(os.popen("pidof systemd").read())
+    while CNT > 0:
+        ppid = os.getppid()
+        if ppid not in (1, pidof_systemd):
+            # with open("/tmp/daemonize.log", 'w') as fp:
+                # print("child not quit!!!", file=fp)
+            # os.system("kill -15 {}".format(ppid))
+            time.sleep(0.5); CNT -= 1
+        else: break
+
+    with open("daemonize.log", 'a') as daemonize_log:
+        print("[{}][grandson verify] pidof systemd: {}; pid: {}; ppid: {}\n".format(
+            time.ctime(), pidof_systemd, os.getpid(), ppid), file=daemonize_log)
+
+    if os.getppid() not in (1, pidof_systemd):
+        os.kill(os.getppid(), signal.SIGTERM)
+
+    if os.getppid() not in (1, pidof_systemd):
+        while True:
+            with open("daemonize.log", 'a') as daemonize_log:
+                print("[{}][grandson while] pidof systemd: {}; pid: {}; ppid: {}\n".format(
+                    time.ctime(), pidof_systemd, os.getpid(), ppid), file=daemonize_log)
+            time.sleep(10)
+        raise RuntimeError("fail to quit child!")
+
+    # grandson work ##############################
     # Flush I/O buffers
     sys.stdout.flush()
     sys.stderr.flush()
@@ -84,8 +131,8 @@ def daemonize(pidfile, *, stdin='/dev/null',
         os.dup2(f.fileno(), sys.stderr.fileno())
 
     # Write the PID file
-    with open(pidfile,'w') as f:
-        print(os.getpid(),file=f)
+    with open(pidfile, 'w') as f:
+        print(os.getpid(), file=f)
 
 
 # DJANGO_PROJ_PATH = "/home/joseph/Devl/SVN/myGit/Gitee/Practice/daemon/test/create4test/"
