@@ -44,7 +44,9 @@ INSTALLED_APPS = [
     #
     'rest_framework',
 
+    # support HTTPS ######
     'django_extensions',
+    'werkzeug_debugger_runserver',
 ]
 
 MIDDLEWARE = [
