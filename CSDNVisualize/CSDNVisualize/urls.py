@@ -16,9 +16,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('CSDNCrawler/', include('CSDNCrawler.urls')),
     path("api/", include('api.urls')),
+
+    # support require authentication access by django owner:
+    path('accounts/', include('django.contrib.auth.urls'))
 ]

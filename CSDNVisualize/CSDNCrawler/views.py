@@ -4,6 +4,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, Http404
 from django.http import JsonResponse
 
+from django.contrib.auth.decorators import login_required
+
 from libCrawler.PersonalData import *
 from libCrawler.PersonalData.webpage import UserData
 from libCrawler.PersonalData.blogpage import PersonBlogCSDN, PersonalArticles
@@ -92,6 +94,10 @@ class EasyDeltaDatetime():
             return int(getattr(self.meta_datetime, attrname) - getattr(self.computer_zero_datetime, attrname))
 
 
+#
+# View part:
+#
+@login_required(login_url='/accounts/login/')
 def startcrawler(request):
     # do the crawler action
     try:
@@ -214,6 +220,7 @@ def startcrawler(request):
     return render(request, 'visualize/mission.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def loopArticles(request):
     try:
         USER_ID = request.GET['user_id']
@@ -265,6 +272,7 @@ def loopArticles(request):
         return HttpResponse("<h1>OK</h1>")
 
 
+@login_required(login_url='/accounts/login/')
 def cleandata(request):
     try:
         dbp = shelve.open("/mnt/sandi_TF/Plateform/database/follows_shelve/"+'UserID')
@@ -293,6 +301,7 @@ class Site(object):
         return self.name
 
 
+@login_required(login_url='/accounts/login/')
 def index(request):
     all_userid_list = UserID.objects.all()
     # all_userid_list[-10::-1]
@@ -304,6 +313,7 @@ def index(request):
                    'site': Site()})
 
 
+@login_required(login_url='/accounts/login/')
 def detail(request, user_id_id):
     userid = get_object_or_404(UserID, pk=user_id_id)
 
@@ -311,6 +321,7 @@ def detail(request, user_id_id):
                   {'userid': userid, })
 
 
+@login_required(login_url='/accounts/login/')
 def userid_add(request):
     if request.method == 'POST':
         try:
@@ -339,6 +350,7 @@ def userid_add(request):
             raise Http404("no new_crawl_target data")
 
 
+@login_required(login_url='/accounts/login/')
 def follows_detail_of_userid(request, pk):
     """ '/CSDNCrawler/userid/<pk>/follows/'
     """
@@ -352,24 +364,7 @@ def follows_detail_of_userid(request, pk):
             raise
 
 
-class EasyDeltaDatetime():
-    from datetime import datetime
-
-    def __init__(self, dstDatetime, srcDatetime):
-        self.dstDatetime = dstDatetime
-        self.srcDatetime = srcDatetime
-        self.computer_zero_datetime = datetime(1970, 1, 1, 0, 0, 0)
-        self.calculate()
-
-    def calculate(self):
-        self.difference = self.dstDatetime - self.srcDatetime
-        self.meta_datetime = self.computer_zero_datetime + self.difference
-
-    def __getattr__(self, attrname):
-        if attrname in ["year", "month", "day", "hour", "minute", "second"]:
-            return int(getattr(self.meta_datetime, attrname) - getattr(self.computer_zero_datetime, attrname))
-
-
+@login_required(login_url='/accounts/login/')
 def crawl_follows(pk, pagesource=None):
     userid = get_object_or_404(UserID, pk=pk)
     f_all = userid.follows_set.all()
@@ -410,6 +405,7 @@ def crawl_follows(pk, pagesource=None):
         return rsp_data
 
 
+@login_required(login_url='/accounts/login/')
 def follows_crawl_of_userid(request, pk):
     """ '/CSDNCrawler/userid/<pk>/crawl/follows/'
     """
@@ -423,6 +419,7 @@ def follows_crawl_of_userid(request, pk):
             return JsonResponse(rsp_data)
 
 
+@login_required(login_url='/accounts/login/')
 def follows_get_of_userid(request, pk):
     userid = get_object_or_404(UserID, pk=pk)
     try:
