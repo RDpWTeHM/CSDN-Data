@@ -1,0 +1,21 @@
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn-csdndata.com.socket
+After=network.target
+
+[Service]
+PIDFil=/run/gunicorn_csdndata.com/pid
+User=joseph
+Group=joseph
+RuntimeDirectory=gunicorn_csdndata.com
+WorkingDirectory=/home/joseph/var/www/csdndata.com/source
+ExecStart=/home/joseph/var/www/csdndata.com/virtualenv/bin/gunicorn \
+          --pid /run/gunicorn_csdndata.com/pid \
+          --bind unix:/tmp/csdndata.com.socket \
+          CSDNVisualize.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

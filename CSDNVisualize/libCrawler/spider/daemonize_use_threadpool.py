@@ -375,8 +375,7 @@ if __name__ == '__main__':
                       stderr=daemonize_LOG_PATH + CONF.STD_FILE)
 
         except RuntimeError as e:
-            print(e, file=sys.stderr)
-            raise SystemExit(1)
+            raise SystemExit("{}".format(e))
             # sys.exit(1)
 
         #
@@ -412,8 +411,13 @@ if __name__ == '__main__':
 
         # make sure parent-> chile processing exit
         ppid = os.getppid()
-        if ppid != 1:
-            os.system("kill -15 {}".format(ppid))
+        pidof_systemd = int(os.popen("pidof systemd").read())
+        logging.warning(
+            "pidof systemd: {}; pid: {}; ppid: {}".format(
+                pidof_systemd, os.getpid(), ppid))
+        if ppid not in (1, pidof_systemd):
+            # os.system("kill -15 {}".format(ppid))
+            raise SystemExit("[{}] daemonize fail due to ppid: {}".format(ctime(), ppid))
 
         main(len(sys.argv), sys.argv)
 

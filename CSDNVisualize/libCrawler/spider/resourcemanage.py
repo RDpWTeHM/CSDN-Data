@@ -17,6 +17,7 @@ from datetime import datetime
 from threading import Thread
 import threading
 from queue import Queue
+import queue
 
 try:
     from selenium import webdriver

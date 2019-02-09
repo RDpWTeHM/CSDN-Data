@@ -1,0 +1,8 @@
+[Unit]
+Description=gunicorn socket
+
+[Socket]
+ListenStream=/tmp/csdndata.com.socket
+
+[Install]
+WantedBy=sockets.target

@@ -18,6 +18,12 @@ a. **v0.1.1 Django REST Framework**
 
 b. **v0.1.2 CSDN-Data Server Develop**
 
+c. **v0.1.3 CSDN-Data deploy**
+
+
+
+
+
 
 
 

@@ -4,6 +4,8 @@ tmp/
 .svnignore
 
 .memento
+server.crt
+server.key
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
