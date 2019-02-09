@@ -23,7 +23,7 @@ conf = Configuration(
     PIDFILE="/tmp/daemon.pid",
     # DEBUG_BROWSER=,
     LOG_PATH="/tmp/",
-    STD_FILE="daemonize_use_threadpool_20190126_2245.log",
+    STD_FILE="daemonize_use_threadpool_20190209_1221.log",
     NEGOTIATE_DOMAIN='', NEGOTIATE_PORT=50007,
     STATUS_DOMAIN='', STATUS_PORT=50008,
 )
