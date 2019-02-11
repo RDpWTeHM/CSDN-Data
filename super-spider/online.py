@@ -10,6 +10,7 @@ TODO:
 import os
 import sys
 from multiprocessing.connection import Client
+# ConnectionRefusedError
 
 ###########################################
 #                 Configuration           #
@@ -23,9 +24,12 @@ def connect_to_server():
     print("online.py: connectting to SERVER...")
     try:
         conn = Client((SERVER_DOMAIN, SERVER_PORT),
-                      authkey=SERVER_AUTHKEY.decode())
+                      authkey=SERVER_AUTHKEY.encode('utf-8'))
     except EOFError:
         raise SystemExit("Server positively close connnection before finish things to be done.")
+    except ConnectionRefusedError:
+        raise SystemExit("Fail to connect SERVER!")
+
     except Exception:
         import traceback; traceback.print_exc();
     else:
@@ -37,7 +41,14 @@ def require_task(conn):
     print("online.py: require task...")
     obj = None
     try:
-        pass
+        conn.send("require task")
+        recv = conn.recv()
+        # checking_receive(recv)
+        obj = recv
+        print("online.py: finish require task.")
+
+    except EOFError:
+        raise SystemExit("Server positively close connnection before finish things to be done.")
 
     except Exception:
         import traceback; traceback.print_exc();

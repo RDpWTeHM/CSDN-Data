@@ -27,9 +27,9 @@ g_options = None
 
 
 def main():
-    # connection = online.connect_to_server()
-    # obj = online.require_task(connection)
-    obj = 'qq_29757283'  # real object will carry more information
+    # -[o] final object will carry more information ########
+    connection = online.connect_to_server()
+    obj = online.require_task(connection)
 
     observer = DBObserver()
     sub = Subject_CSDN_UserInfoVisual(obj, g_options)
