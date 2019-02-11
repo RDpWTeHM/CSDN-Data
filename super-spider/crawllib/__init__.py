@@ -53,7 +53,8 @@ class VisitCrawl(ABC):
         else:
             browser = self.fakeRM.acquire_browser_handler_by_create()
         browser.get(self._gen_url())
-        sleep(5)
+        if not __debug__:
+            sleep(5)
         self.browser = browser
 
     @abstractmethod
@@ -97,12 +98,6 @@ class VisitCrawl(ABC):
         return ret
 
 
-class Observer(ABC):
-    @abstractmethod
-    def notify(self):
-        """Subject call this func. """
-
-
 # class Subject(Crawl):
 
 
@@ -134,9 +129,12 @@ class SubjectCrawl(ABC):
     def _monitor(self, browser_type=None):
         """do the monitor job"""
         self._setup_browser(browser_type=browser_type)
-        self.notifyAll(self._parse())  # '._parse' come from VisitCrawl
-
-        self._free_browser()
+        try:
+            self.notifyAll(self._parse())  # '._parse' come from VisitCrawl
+        except Exception:
+            import traceback; traceback.print_exc();
+        finally:
+            self._free_browser()
 
     def run(self):
         self._monitor()

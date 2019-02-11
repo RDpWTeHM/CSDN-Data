@@ -10,6 +10,7 @@ import sys
 #
 # Project path
 #
+"""
 try:
     _cwd = os.getcwd()
     _proj_abs_path = _cwd[0:_cwd.find("super-spider")]  # not include super-spider
@@ -25,11 +26,20 @@ try:
 except Exception:
     import traceback; traceback.print_exc();  # -[o] fix later by using argv
     sys.exit(1)
+"""
 
-from crawllib import Observer
+from abc import ABC, abstractmethod
+
+
+class Observer(ABC):
+    @abstractmethod
+    def notify(self):
+        """Subject call this func. """
 
 
 class DBObserver(Observer):
-    def notify(self, *args, **kw):
-        print("BDObserver> notify: *args: {}\n\t**kw: {}".format(
-            *args, **kw))
+    def notify(self, subject, *args, **kw):
+        print("BDObserver> notify: ")
+        print("\tsubject: {}".format(subject))
+        print("\targs: \t(unpack status){}".format(args))
+        print("\tkw: \t(unpack status){}".format(kw))
