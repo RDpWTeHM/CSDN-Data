@@ -18,13 +18,15 @@ domain = "http://localhost:8010"
 
 def get_rest_auth_key_dict(username, password):
     '''n/a '''
-    # r = requests.post()
-    r = None
+    url = "/api/rest_auth/login/"
+    r = requests.post(domain + url, headers=json_header,
+                      data=json.dumps({"username": rest_auth_username,
+                                       "password": rest_auth_password, }))
 
-    def parser_rquest_result_get_rest_auth_key(r):
-        return "ff1316bf7b3e2502b9ac85cbddcee65db17f007b"
+    def parser_response_key_in_d(r):
+        return json.loads(r.text)['key']
 
-    return {'Authorization': 'Token ' + parser_rquest_result_get_rest_auth_key(r)}
+    return {'Authorization': 'Token ' + parser_response_key_in_d(r)}
 
 
 def get_rest_framework_user_id_index(user_id):
