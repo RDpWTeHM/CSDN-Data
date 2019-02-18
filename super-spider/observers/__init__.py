@@ -30,7 +30,6 @@ except Exception:
 
 from abc import ABC, abstractmethod
 
-
 from . import proxy
 
 
@@ -49,8 +48,8 @@ class DBObserver(Observer):
 
         # send data to server here => crawlerdata, user_id
         status_code, text = proxy.send_visualdata2server(
-            proxy.crawl_visualdata_to_jsondict(args[0]),
-            'qq_29757283'
+            proxy.crawl_visualdata_to_jsondict(args[0], subject.user_id),
+            subject.user_id,
         )
 
         print("status_code: {} && text: {}\n\n".format(status_code, text))

@@ -10,7 +10,13 @@ import requests
 import json
 
 
-def get_rest_auth_key(username, password):
+rest_auth_username = "admin"
+rest_auth_password = "Viusai//"
+json_header = {'Content-Type': 'application/json'}
+domain = "http://localhost:8010"
+
+
+def get_rest_auth_key_dict(username, password):
     '''n/a '''
     # r = requests.post()
     r = None
@@ -18,10 +24,22 @@ def get_rest_auth_key(username, password):
     def parser_rquest_result_get_rest_auth_key(r):
         return "ff1316bf7b3e2502b9ac85cbddcee65db17f007b"
 
-    return parser_rquest_result_get_rest_auth_key(r)
+    return {'Authorization': 'Token ' + parser_rquest_result_get_rest_auth_key(r)}
 
 
-def crawl_visualdata_to_jsondict(data):
+def get_rest_framework_user_id_index(user_id):
+    url = "/api/v1/CSDNCrawler/userids/{}/".format(user_id)
+    full_path = domain + url
+    r = requests.get(full_path,
+                     headers=get_rest_auth_key_dict(rest_auth_username,
+                                                    rest_auth_password), )
+    data = json.loads(r.text)
+    print("{} > data: {}".format("get_rest_framework_user_id_index", data))
+    ret = data['id']
+    return ret
+
+
+def crawl_visualdata_to_jsondict(data, user_id):
     '''data = {
         "originality": 94,
         "reprint": 14,
@@ -45,7 +63,7 @@ def crawl_visualdata_to_jsondict(data):
         dstdata['comments'] = int(data['comments'])
         dstdata['visitors'] = int(data['visitors'])
         dstdata['rank'] = int(data['rank'])
-        dstdata['user_id'] = 1
+        dstdata['user_id'] = get_rest_framework_user_id_index(user_id)
     except Exception as err:
         import traceback; traceback.print_exc();
         raise
@@ -63,11 +81,12 @@ def send_visualdata2server(data, user_id):
     usage:
         send_visualdata2server(crawl_visualdata_to_jsondict(src_data))
     '''
-    header = {"Authorization": "Token ",
-              'Content-Type': 'application/json', }
-    header["Authorization"] += get_rest_auth_key("admin", "Viusai//")
+    header = json_header
+    header.update(
+        get_rest_auth_key_dict(rest_auth_username, rest_auth_password))
 
-    url = "http://localhost:8010/api/v1/CSDNCrawler/userids/{}/visualdatas/".format(user_id)
-    r = requests.post(url, data=json.dumps(data), headers=header)
+    url = "/api/v1/CSDNCrawler/userids/{}/visualdatas/".format(user_id)
+    full_path = domain + url
+    r = requests.post(full_path, data=json.dumps(data), headers=header)
 
     return (r.status_code, r.text)
