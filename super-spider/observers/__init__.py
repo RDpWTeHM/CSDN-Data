@@ -31,6 +31,9 @@ except Exception:
 from abc import ABC, abstractmethod
 
 
+from . import proxy
+
+
 class Observer(ABC):
     @abstractmethod
     def notify(self):
@@ -42,4 +45,12 @@ class DBObserver(Observer):
         print("BDObserver> notify: ")
         print("\tsubject: {}".format(subject))
         print("\targs: \t(unpack status){}".format(args))
-        print("\tkw: \t(unpack status){}".format(kw))
+        print("\tkw: \t(unpack status){}\n".format(kw))
+
+        # send data to server here => crawlerdata, user_id
+        status_code, text = proxy.send_visualdata2server(
+            proxy.crawl_visualdata_to_jsondict(args[0]),
+            'qq_29757283'
+        )
+
+        print("status_code: {} && text: {}\n\n".format(status_code, text))
