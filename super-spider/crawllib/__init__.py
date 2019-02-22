@@ -7,6 +7,7 @@ import sys
 import os
 from abc import ABC, abstractmethod
 
+from .resourcemanage import BrowserResource
 from .resourcemanage import FakeResourceMange
 
 
@@ -20,7 +21,10 @@ class Crawl(dict, metaclass=CrawlMetaclass):
 
 class VisitCrawl(ABC):
     def __init__(self, *args, **kw):
-        self.fakeRM = FakeResourceMange()
+        if not __debug__:
+            self.brrs = BrowserResource()
+        else:
+            self.fakeRM = FakeResourceMange()
 
     @abstractmethod
     def _gen_url(self):
@@ -28,30 +32,18 @@ class VisitCrawl(ABC):
 
     @abstractmethod
     def _setup_browser(self, browser_type=None):
+        browser = None
         if not __debug__:
-            from selenium import webdriver
-            from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-            if browser_type is None: browser_type = "Chrome"
-            _f = getattr(webdriver, browser_type)
-            if browser_type == "Chrome":
-                capa = DesiredCapabilities().CHROME
-                capa["pageLoadStrategy"] = "none"
-                from selenium.webdriver.chrome.options import Options
-                croptions = Options()
-                # __string, = ("user-agent=Mozilla/5.0 "
-                #              "(Windows NT 10.0; Win64; x64) "
-                #              "AppleWebKit/537.36 (KHTML, like Geoko) "
-                #              "Chrome/70.0.3538.102 Safari/537.36", )
-                # croptions.add_argument(__string)
-                browser = _f(
-                    executable_path="/usr/lib/chromium-browser/chromedriver",
-                    desired_capabilities=capa,
-                    chrome_options=croptions, )
-            else:  # not chrome
-                browser = _f()
-            del _f
+            # -[x] browser_id as input-parameter, reference old CSDNData code.
+            # no input-parameter specific browser_id
+            try:
+                browser = self.brrs.acquire_browser_handler_by_create()
+            except Exception:
+                browser = self.brrs.acquire_browser_handler_from_queue()
         else:
             browser = self.fakeRM.acquire_browser_handler_by_create()
+
+        # -[o] .get(url) here is not apposite
         browser.get(self._gen_url())
         if not __debug__:
             sleep(5)
@@ -60,7 +52,7 @@ class VisitCrawl(ABC):
     @abstractmethod
     def _free_browser(self):
         if not __debug__:
-            self.browser.close()
+            self.brrs.release_browser_handler(self.browser)
             del self.browser
         else:
             self.fakeRM.release_browser_handler(self.browser)

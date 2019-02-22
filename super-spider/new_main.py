@@ -6,6 +6,10 @@
 import sys
 import os
 
+import threading
+
+from crawllib import resourcemanage
+
 from userindex import Subject_CSDN_UserInfoVisual
 from observers import DBObserver
 import online
@@ -13,8 +17,25 @@ import online
 import signal
 
 
+def manage_selenium_start():
+    res = resourcemanage.BrowserResource()
+    if __debug__:
+        print("check Singleton> id(res): {}".format(id(res)),
+              file=sys.stderr)
+    t = threading.Thread(target=res.manage, )
+    t.setDaemon(True)
+    t.start()
+    del t
+
+
+def manage_selenium_stop():
+    res = resourcemanage.BrowserResource()
+    res.handler_quit()
+
+
 def sigint_handler(signo, frame):
     ''' show catch Ctrl+C information!'''
+    manage_selenium_stop()
     print("\nGoodbay Cruel World.....\n")
     raise SystemExit(1)
 
@@ -27,14 +48,25 @@ g_options = None
 
 
 def main():
-    # -[o] final object will carry more information ########
+    # program-system back-end  ########################
+    manage_selenium_start()
+
+    # online  ##########################################
+    # -[o] final object will carry more information
     connection = online.connect_to_server()
     obj = online.require_task(connection)
 
+    # bridge to server ##################################
     observer = DBObserver()
     sub = Subject_CSDN_UserInfoVisual(obj, g_options)
     sub.register(observer)
+
+    # key and subject-monitor ###########################
     sub.run()
+
+    # program-system exit part ##########################
+    # -[x] reference old CSDNData code.
+    manage_selenium_stop()
 
 
 if __name__ == '__main__':
