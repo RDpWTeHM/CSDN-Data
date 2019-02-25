@@ -40,18 +40,25 @@ def connect_to_server():
 def require_task(conn):
     print("online.py: require task...")
     obj = None
+
+    def checking_receive(recvdata):
+        if recvdata == '':
+            raise ValueError('no task')
+
     try:
         conn.send("require task")
         recv = conn.recv()
-        # checking_receive(recv)
+        checking_receive(recv)
         obj = recv
         print("online.py: finish require task.")
 
     except EOFError:
         raise SystemExit("Server positively close connnection before finish things to be done.")
-
+    except ValueError:
+        raise
     except Exception:
         import traceback; traceback.print_exc();
+        raise
 
     else:
         pass

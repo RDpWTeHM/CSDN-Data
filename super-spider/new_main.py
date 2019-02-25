@@ -2,7 +2,8 @@
 
 """
 Usage:
-  $ python -O new_main.py -b Chrome
+  terminal-1 $ python tmp.py # or $ python >>> import tmp; tmp.server_on()
+  terminal-2 $ python -O new_main.py -b Chrome
 
 TODO:
   -[o] n/a
@@ -28,6 +29,7 @@ import signal
 
 qprogram = queue.Queue()
 g_options = None
+qtasks = queue.Queue()
 
 
 def manage_selenium_start():
@@ -51,7 +53,7 @@ def sigint_handler(signo, frame):
     manage_selenium_stop()
     qprogram.put(('run_tasks', 'quit'))
     print("\nGoodbay Cruel World.....\n")
-    raise SystemExit(1)
+    # raise SystemExit(1)
 
 
 # def sigterm_handler(signo, frame):
@@ -62,42 +64,71 @@ def prog_init():
 
 
 class TaskManage(Thread):
-    '''
-    -[o] the threading.Thread sub-class define?
+    '''-[o] tobe singleton
     '''
 
     def __init__(self, qtasks):
         Thread.__init__(self)
-        self.task_nums = 0
+        self._running = True
+
         self.qtasks = qtasks
+        self.task_nums = 0
+        self.stop_more = False
+
         self.observer = DBObserver()
 
-    def can_handler_more_task(self):
+    def terminate(self):
+        self._running = False
+
+    def handler_more_task(self):
+
         def check_system_resource_and_time():
-            if self.task_nums < 10:
+            if self.task_nums < 4:
                 return True
             else:
                 return False
 
-        if check_system_resource_and_time():
+        if self.stop_more is False and check_system_resource_and_time():
             return True
         else:
             return False
 
     def run(self):
+        '''线程类：
+          -[x] 线程终止
+          -[o] 含有 socket, IO 超时
+        '''
+
         while True:
-            if self.can_handler_more_task():
-                # online  ##########################################
-                # -[o] final object will carry more information
-                connection = online.connect_to_server()
-                obj = online.require_task(connection)
+            if not self._running:
+                print("{}@run: Thread quit".format(type(self).__name__))
+                break
 
-                # bridge to server ##################################
-                sub = Subject_CSDN_UserInfoVisual(obj, g_options)
-                sub.register(self.observer)
+            try:
+                if self.handler_more_task():
+                    # online  ##########################################
+                    # -[o] final object will carry more information
+                    connection = online.connect_to_server()
+                    obj = online.require_task(connection)
+                    print("{}@run: online got obj: {}".format(
+                        type(self).__name__, obj))
 
-                self.qtasks.put(sub)
-                self.task_nums += 1
+                    # bridge to server ##################################
+                    sub = Subject_CSDN_UserInfoVisual(obj, g_options)
+                    sub.register(self.observer)
+
+                    self.qtasks.put(sub)
+                    self.task_nums += 1
+            except ValueError as err:
+                '''如何运行到这里：
+                    ValueError 在 online.require_task 抛出，
+                    抛出的条件是先继续请求，然后 server 回复 '' 字符串。
+                        server 回复 '' 字符串的条件检查代码。
+                    修改 `self.task_nums < 4` 判断条件，使最大数值大于 server user id list
+                    的长度，这里就可以验证这个 except 代码是否工作！
+                '''
+                print("{}@run: {}".format(type(self).__name__, err))
+                self.stop_more = True
 
             time.sleep(60)  # every 1min do TaskManage().run()
 
@@ -105,48 +136,69 @@ class TaskManage(Thread):
 def loop():
     '''
     '''
-    qtasks = queue.Queue()
 
-    def run_tasks():
-        def quit_run_tasks():
-            pmsg = qprogram.get()
-            try:
-                if pmsg[0] == 'run_tasks':
-                    if pmsg[1] == 'quit':
-                        return True
-            except IndexError:
-                qprogram.put(pmsg)
-
+    def quit_run_tasks(tim=1):
+        try:
+            pmsg = qprogram.get(timeout=tim)  # do not block!
+            if pmsg[0] == 'run_tasks':
+                if pmsg[1] == 'quit':
+                    return True
+        except queue.Empty:
+            print("@loop>quit_run_tasks: keep running...")
+            return False
+        except IndexError as err:
+            print("@loop>quit_run_tasks: {}".format(err))
+            print("\tpmsg: {}".format(pmsg))
+            qprogram.put(pmsg)
+        else:
+            print("@loop>quit_run_tasks: pmsg=={}".format(pmsg))
             # not belong to me
             qprogram.put(pmsg)
-            return False
+        return False
 
-        while True:
-            if quit_run_tasks():
-                break
-
+    while True:
+        # -[o] will sleep in sub.run() for multi-subject
+        try:
             # key and subject-monitor ###########################
-            sub = qtasks.get()  # block
+            sub = qtasks.get(timeout=1)
+            print("@loop: {}".format(sub))
             sub.run()
             qtasks.put(sub)
 
             # report status/information to server ##############
             # - [ ] ...report_info...
+        except queue.Empty:
+            tsleep = 300
+        except Exception as err:
+            import traceback; traceback.print_exc();
+            print("@loop: {}".format(err))
+            break
+        else:
+            # time.sleep(60*60*24)  # one loop one userid
+            tsleep = 60
 
-    t = threading.Thread(target=run_tasks)
-    t.setDaemon(False)
-    t.start()
-
-    # require job to qtasks
-    task_manage = TaskManage(qtasks)
-    task_manage.start()
+        if quit_run_tasks(tsleep):  # use block as sleep
+            # -[o] make server know this-client
+            #      not handler those tasks(user ids) any more
+            print("quit run_tasks")
+            break
 
 
 def main():
     # program-system back-end  ########################
     manage_selenium_start()
 
+
+    # other-thread 2 -- task_manage
+    # require job to qtasks
+    task_manage = TaskManage(qtasks)
+    task_manage.start()
+
+    print("start loop")
     loop()
+    print("end loop")
+
+    task_manage.terminate()
 
     # program-system exit part ##########################
     # -[x] reference old CSDNData code.
@@ -172,3 +224,81 @@ if __name__ == '__main__':
     prog_init()  # register signal; etc...
 
     main()
+
+
+"""附
+==== tmp.py 代码模拟 server ======
+'''
+-[o] got client quit information, put associate user_id back
+'''
+import os
+import sys
+import copy
+
+from multiprocessing.connection import Listener
+
+
+def run_sever():
+    return Listener(('', 2736), authkey=b'CSDN-Data')
+
+
+def response_user_id(connection, user_id):
+    try:
+        connection.send(user_id)
+        while True:
+            print(connection.recv())
+    except EOFError:
+        print("finished")
+
+user_id_list = [
+    'qq_29757283',
+    'magic_wz',
+    'alen1985',
+    'liuzhixiong_521',
+]
+
+user_id_be_monitor = set()
+user_id_left = set()
+user_id_list_copy = set()
+
+def give_user_id(conn):
+    user_id_list_copy = set(user_id_list)
+    user_id_left = user_id_list_copy - user_id_be_monitor
+
+    try:
+        new_be_monitor = user_id_left.pop()
+        response_user_id(conn, copy.copy(new_be_monitor))
+    except KeyError:
+        response_user_id(conn, '')
+    except Exception as err:
+        import traceback; traceback.print_exc();
+        print("[debug](NOT quit)@give_user_id: {}".format(err))
+    else:  # success
+        user_id_be_monitor.add(new_be_monitor)
+
+
+def server_on():
+    serv = run_sever()
+    while True:
+        try:
+            client = serv.accept()
+            print(client.recv())
+            give_user_id(client)
+        except Exception as err:
+            import traceback; traceback.print_exc();
+            raise SystemExit("@server_on: {}".format(err))
+        except InterruptedError:
+            raise SystemExit("processing quit!")
+
+
+def main():
+    try:
+        server_on()
+    except InterruptedError:
+        raise SystemExit("processing quit!")
+
+
+if __name__ == '__main__':
+    main()
+
+"""
