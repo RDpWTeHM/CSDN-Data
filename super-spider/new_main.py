@@ -30,6 +30,7 @@ import signal
 qprogram = queue.Queue()
 g_options = None
 qtasks = queue.Queue()
+g_thrs = []
 
 
 def manage_selenium_start():
@@ -50,8 +51,12 @@ def manage_selenium_stop():
 
 def sigint_handler(signo, frame):
     ''' show catch Ctrl+C information!'''
-    manage_selenium_stop()
-    qprogram.put(('run_tasks', 'quit'))
+    t = Thread(target=manage_selenium_stop)
+    t.start()
+    g_thrs.append(t)
+
+    qprogram.put('quit')
+    # qprogram.put(('task_manage', 'quit'))
     print("\nGoodbay Cruel World.....\n")
     # raise SystemExit(1)
 
@@ -69,7 +74,6 @@ class TaskManage(Thread):
 
     def __init__(self, qtasks):
         Thread.__init__(self)
-        self._running = True
 
         self.qtasks = qtasks
         self.task_nums = 0
@@ -77,8 +81,21 @@ class TaskManage(Thread):
 
         self.observer = DBObserver()
 
-    def terminate(self):
-        self._running = False
+    def quit_task_manage(self, tim=False):
+        try:
+            pmsg = qprogram.get(timeout=tim)  # do not block!
+            if pmsg == 'quit':
+                qprogram.put(pmsg)
+                return True
+            # do other thread control things
+        except queue.Empty:
+            print("@loop>quit_task_manage: keep running...")
+            return False
+        else:
+            print("@loop>quit_task_manage: pmsg=={}".format(pmsg))
+            # not belong to me
+            qprogram.put(pmsg)
+        return False
 
     def handler_more_task(self):
 
@@ -93,6 +110,9 @@ class TaskManage(Thread):
         else:
             return False
 
+    def release_tasks(self):
+        pass
+
     def run(self):
         '''线程类：
           -[x] 线程终止
@@ -100,10 +120,6 @@ class TaskManage(Thread):
         '''
 
         while True:
-            if not self._running:
-                print("{}@run: Thread quit".format(type(self).__name__))
-                break
-
             try:
                 if self.handler_more_task():
                     # online  ##########################################
@@ -129,27 +145,36 @@ class TaskManage(Thread):
                 '''
                 print("{}@run: {}".format(type(self).__name__, err))
                 self.stop_more = True
+            except Exception as err:
+                import traceback; traceback.print_exc();
+                print("{}@run quit whith: {}".format(type(self).__name__, err))
+                self.release_tasks()
+                break
 
-            time.sleep(60)  # every 1min do TaskManage().run()
+            if self.quit_task_manage(60):  # every 1min do TaskManage().run()
+                # -[o] make server know this-client
+                #      not handler those tasks(user ids) any more
+                self.release_tasks()
+                print("{}@run: Thread quit".format(type(self).__name__))
+                break
 
 
 def loop():
     '''
+        -[o] more functional - set subject with next run time;
+             then loop subjects in qtasks.
     '''
 
     def quit_run_tasks(tim=1):
         try:
             pmsg = qprogram.get(timeout=tim)  # do not block!
-            if pmsg[0] == 'run_tasks':
-                if pmsg[1] == 'quit':
-                    return True
+            if pmsg == 'quit':
+                qprogram.put(pmsg)
+                return True
+            # do other thread control thins...
         except queue.Empty:
             print("@loop>quit_run_tasks: keep running...")
             return False
-        except IndexError as err:
-            print("@loop>quit_run_tasks: {}".format(err))
-            print("\tpmsg: {}".format(pmsg))
-            qprogram.put(pmsg)
         else:
             print("@loop>quit_run_tasks: pmsg=={}".format(pmsg))
             # not belong to me
@@ -160,7 +185,7 @@ def loop():
         # -[o] will sleep in sub.run() for multi-subject
         try:
             # key and subject-monitor ###########################
-            sub = qtasks.get(timeout=1)
+            sub = qtasks.get(block=False)
             print("@loop: {}".format(sub))
             sub.run()
             qtasks.put(sub)
@@ -168,18 +193,16 @@ def loop():
             # report status/information to server ##############
             # - [ ] ...report_info...
         except queue.Empty:
-            tsleep = 300
+            tsleep = 30
         except Exception as err:
             import traceback; traceback.print_exc();
-            print("@loop: {}".format(err))
+            print("@loop quit with: {}".format(err))
             break
         else:
             # time.sleep(60*60*24)  # one loop one userid
             tsleep = 60
 
         if quit_run_tasks(tsleep):  # use block as sleep
-            # -[o] make server know this-client
-            #      not handler those tasks(user ids) any more
             print("quit run_tasks")
             break
 
@@ -188,21 +211,20 @@ def main():
     # program-system back-end  ########################
     manage_selenium_start()
 
-
     # other-thread 2 -- task_manage
     # require job to qtasks
     task_manage = TaskManage(qtasks)
     task_manage.start()
+    g_thrs.append(task_manage)
 
     print("start loop")
     loop()
     print("end loop")
 
-    task_manage.terminate()
-
     # program-system exit part ##########################
     # -[x] reference old CSDNData code.
-    manage_selenium_stop()
+    for t in g_thrs:
+        t.join()
 
 
 if __name__ == '__main__':
