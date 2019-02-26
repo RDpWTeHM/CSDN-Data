@@ -134,6 +134,9 @@ class BrowserResource(object):
     __manage_run_Lock = threading.Lock()
     __manage_run_flag = False
 
+    __quit_Lock = threading.Lock()
+    __quit_flag = False
+
     def __new__(cls, *args, **kw):  # Singleton
         if not hasattr(cls, 'instance'):
             cls.instance = super(BrowserResource, cls).__new__(cls, *args, **kw)
@@ -238,6 +241,12 @@ class BrowserResource(object):
             self.__do_check_timeout_consider_as_crash()
 
     def handler_quit(self):
+        with self.__quit_Lock:
+            if self.__quit_flag:
+                raise RuntimeError("handler_quit() had been running already!")
+            else:  # flas == False, keep run fallow logical.
+                self.__quit_flag = True
+
         with self._browser_state_Lock:
             while True:
                 try:
