@@ -11,7 +11,7 @@ import json
 
 
 rest_auth_username = "admin"
-rest_auth_password = "Viusai//"
+rest_auth_password = "-[o] change me"
 json_header = {'Content-Type': 'application/json'}
 domain = "http://localhost:8010"
 

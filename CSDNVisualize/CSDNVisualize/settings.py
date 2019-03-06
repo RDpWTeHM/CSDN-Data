@@ -97,7 +97,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'CSDNData',
         'USER': 'joseph',
-        'PASSWORD': 'Viusai//',
+        'PASSWORD': "-[o] change me to Password",
         'default-character-set': 'utf8',
         'HOST': 'localhost',
         'PORT': '3306',
