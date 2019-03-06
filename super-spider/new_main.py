@@ -16,21 +16,37 @@ import time
 
 import threading
 from threading import Thread
-import queue
+# import queue
 
+# import signal
+
+# program-system    #################
+from utils import progsys
+from utils.progsys import prog_init
+
+# main-thread(program)  ##############
+import progtask
+
+# component    ######################
 from crawllib import resourcemanage
 
-from userindex import Subject_CSDN_UserInfoVisual
-from observers import DBObserver
-import online
-
-import signal
+# import client
+from client.task import TaskManage
+from client.work import Work
 
 
-qprogram = queue.Queue()
+###########################################
+# main-thread global variables            #
+###########################################
 g_options = None
-qtasks = queue.Queue()
-g_thrs = []
+
+# program-system  ##############
+progQ = progsys.progQ
+pmsg = progsys.pmsg
+progquits = progsys.progquits
+
+# duty of main-thread  ##########
+g_thrs = []  # threads need to be wait exit.
 
 
 def manage_selenium_start():
@@ -46,180 +62,36 @@ def manage_selenium_start():
 
 def manage_selenium_stop():
     res = resourcemanage.BrowserResource()
-    res.handler_quit()
-
-
-def sigint_handler(signo, frame):
-    ''' show catch Ctrl+C information!'''
-    t = Thread(target=manage_selenium_stop)
+    t = Thread(target=res.handler_quit)
     t.start()
     g_thrs.append(t)
 
-    qprogram.put('quit')
-    # qprogram.put(('task_manage', 'quit'))
-    print("\nGoodbay Cruel World.....\n")
-    # raise SystemExit(1)
 
-
-# def sigterm_handler(signo, frame):
-
-
-def prog_init():
-    signal.signal(signal.SIGINT, sigint_handler)
-
-
-class TaskManage(Thread):
-    '''-[o] tobe singleton
-    '''
-
-    def __init__(self, qtasks):
-        Thread.__init__(self)
-
-        self.qtasks = qtasks
-        self.task_nums = 0
-        self.stop_more = False
-
-        self.observer = DBObserver()
-
-    def quit_task_manage(self, tim=False):
-        try:
-            pmsg = qprogram.get(timeout=tim)  # do not block!
-            if pmsg == 'quit':
-                qprogram.put(pmsg)
-                return True
-            # do other thread control things
-        except queue.Empty:
-            print("@loop>quit_task_manage: keep running...")
-            return False
-        else:
-            print("@loop>quit_task_manage: pmsg=={}".format(pmsg))
-            # not belong to me
-            qprogram.put(pmsg)
-        return False
-
-    def handler_more_task(self):
-
-        def check_system_resource_and_time():
-            if self.task_nums < 4:
-                return True
-            else:
-                return False
-
-        if self.stop_more is False and check_system_resource_and_time():
-            return True
-        else:
-            return False
-
-    def release_tasks(self):
-        pass
-
-    def run(self):
-        '''线程类：
-          -[x] 线程终止
-          -[o] 含有 socket, IO 超时
-        '''
-
-        while True:
-            try:
-                if self.handler_more_task():
-                    # online  ##########################################
-                    # -[o] final object will carry more information
-                    connection = online.connect_to_server()
-                    obj = online.require_task(connection)
-                    print("{}@run: online got obj: {}".format(
-                        type(self).__name__, obj))
-
-                    # bridge to server ##################################
-                    sub = Subject_CSDN_UserInfoVisual(obj, g_options)
-                    sub.register(self.observer)
-
-                    self.qtasks.put(sub)
-                    self.task_nums += 1
-            except ValueError as err:
-                '''如何运行到这里：
-                    ValueError 在 online.require_task 抛出，
-                    抛出的条件是先继续请求，然后 server 回复 '' 字符串。
-                        server 回复 '' 字符串的条件检查代码。
-                    修改 `self.task_nums < 4` 判断条件，使最大数值大于 server user id list
-                    的长度，这里就可以验证这个 except 代码是否工作！
-                '''
-                print("{}@run: {}".format(type(self).__name__, err))
-                self.stop_more = True
-            except Exception as err:
-                import traceback; traceback.print_exc();
-                print("{}@run quit whith: {}".format(type(self).__name__, err))
-                self.release_tasks()
-                break
-
-            if self.quit_task_manage(60):  # every 1min do TaskManage().run()
-                # -[o] make server know this-client
-                #      not handler those tasks(user ids) any more
-                self.release_tasks()
-                print("{}@run: Thread quit".format(type(self).__name__))
-                break
-
-
-def loop():
-    '''
-        -[o] more functional - set subject with next run time;
-             then loop subjects in qtasks.
-    '''
-
-    def quit_run_tasks(tim=1):
-        try:
-            pmsg = qprogram.get(timeout=tim)  # do not block!
-            if pmsg == 'quit':
-                qprogram.put(pmsg)
-                return True
-            # do other thread control thins...
-        except queue.Empty:
-            print("@loop>quit_run_tasks: keep running...")
-            return False
-        else:
-            print("@loop>quit_run_tasks: pmsg=={}".format(pmsg))
-            # not belong to me
-            qprogram.put(pmsg)
-        return False
-
-    while True:
-        # -[o] will sleep in sub.run() for multi-subject
-        try:
-            # key and subject-monitor ###########################
-            sub = qtasks.get(block=False)
-            print("@loop: {}".format(sub))
-            sub.run()
-            qtasks.put(sub)
-
-            # report status/information to server ##############
-            # - [ ] ...report_info...
-        except queue.Empty:
-            tsleep = 30
-        except Exception as err:
-            import traceback; traceback.print_exc();
-            print("@loop quit with: {}".format(err))
-            break
-        else:
-            # time.sleep(60*60*24)  # one loop one userid
-            tsleep = 60
-
-        if quit_run_tasks(tsleep):  # use block as sleep
-            print("quit run_tasks")
-            break
+def seleniumage_quit_register():
+    progquits.append(manage_selenium_stop)
 
 
 def main():
     # program-system back-end  ########################
     manage_selenium_start()
+    seleniumage_quit_register()  # seleniumage--v2 name
 
+    # real client-system, do the main-function  #######
     # other-thread 2 -- task_manage
-    # require job to qtasks
-    task_manage = TaskManage(qtasks)
+    # require job to tasksQ
+    print("start task-mange")
+    task_manage = TaskManage()
     task_manage.start()
+    task_manage.register('QUIT')
     g_thrs.append(task_manage)
 
-    print("start loop")
-    loop()
-    print("end loop")
+    print("start work")
+    work = Work()
+    work.start()
+    g_thrs.append(work)
+
+    # main-thread     ###################################
+    progtask.progage()
 
     # program-system exit part ##########################
     # -[x] reference old CSDNData code.

@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 #
 # Project path
 #
+''' no need when model at root-dir program
 try:
     _cwd = os.getcwd()
     _proj_abs_path = _cwd[0:_cwd.find("super-spider")]
@@ -24,6 +25,7 @@ try:
 except Exception:
     import traceback; traceback.print_exc();  # -[o] fix later by using argv
     sys.exit(1)
+'''
 
 
 ################################
