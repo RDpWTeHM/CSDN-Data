@@ -32,6 +32,12 @@ Visualize Personal CSDN Data
 
 干净的 source code of this project 开始：
 
+> 2019/03/06 update
+> 当前默认数据库已经切换默认为 MySQL，以下步骤需要在配置正确 MySQL Server 之后执行。
+> 配置步骤参考 Doc/ 中的文档。
+>
+> ------ 
+>
 > 本段落为开发 Crawler CSDN v0.0.5 之后撰写，因为在 CSDN 的爬虫程序 v0.0.5 上开发超过两周的时间，CSDN-Data 项目的开发有些遗忘。
 >
 > 本部分是为了整合 Crawler CSDN v0.0.5 的测试写的步骤。所以是完全没有数据库和其它调整的 source code 开始“部署”运行。
