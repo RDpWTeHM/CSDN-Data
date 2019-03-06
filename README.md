@@ -26,7 +26,7 @@ Visualize Personal CSDN Data
 
 ## Summary
 
-~~![v0.0.2 project logical](res/define_v0.0.2.png)~~
+~~![v0.0.2 project logical](~~
 
 ### Usage
 
