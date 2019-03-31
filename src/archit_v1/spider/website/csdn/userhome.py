@@ -100,3 +100,19 @@ class UserInfoium(crawlium):
     def _gen_url(self):
         self.url = "https://me.csdn.net/" + self.user_id
         return self.url
+
+    def crawl(self):
+        try:
+            self.browser.get(self._gen_url())
+            # if element is OK
+            sleep(3)
+            d = self._parse()
+            for k, v in d.items():
+                try:
+                    d[k] = int(v)
+                except ValueError:
+                    pass
+            return d
+        except Exception:
+            traceback.print_exc()
+            raise

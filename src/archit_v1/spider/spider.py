@@ -3,10 +3,10 @@
 
 """the 'spider/' module(single function) usage demo"""
 
-import os
+# import os
 import sys
 import time
-
+import traceback
 
 print("path: ", sys.path)
 
@@ -65,11 +65,18 @@ def _create_new_browser():
     return browser
 
 
+def get_crawl_csdn_userinfo(user_id, browser):
+    userinfoium = UserInfoium(user_id, browser)
+    return userinfoium.crawl()
+
+
 def main():
     browser = _create_new_browser()
     try:
-        userinfoium = UserInfoium("qq_29757283", browser)
-        print(userinfoium.crawl())
+        print(get_crawl_csdn_userinfo("qq_29757283", browser))
+    except Exception as err:
+        print("====\n{}\n====".format(err), file=sys.stderr)
+        traceback.print_exc()
     finally:
         browser.quit()
 
