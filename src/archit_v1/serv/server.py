@@ -14,5 +14,5 @@ def run():
 
     # trick: use django-models,
     # must import after `os.environ.setdefault(`
-    import producer
+    from usr import producer
     producer.run()

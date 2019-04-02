@@ -1,4 +1,4 @@
-# serv/producer/__init__.py
+# serv/usr/producer.py
 """
 Note:
     producer/ under django-project -> "serv/",
