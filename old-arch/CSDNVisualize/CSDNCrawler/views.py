@@ -14,6 +14,8 @@ from libCrawler.PersonalData.exceptions import *
 
 import sys
 # import os
+import traceback
+
 from django.template import loader
 from .models import UserID, VisualData
 from .models import Article
@@ -342,11 +344,11 @@ def userid_add(request):
                             user_id=CSDN_UserID, name=CSDN_UserName)
                         return redirect("/" + "CSDNCrawler/")
                 except Exception as err:
-                    import traceback; traceback.print_exc();
+                    traceback.print_exc()
                     raise Http404("server busy")
 
         except Exception as e:
-            import traceback; traceback.print_exc();
+            traceback.print_exc()
             raise Http404("no new_crawl_target data")
 
 
@@ -360,7 +362,7 @@ def follows_detail_of_userid(request, pk):
             return render(request, "visualize/follows_detail.html",
                           {"userid_obj": userid_obj})
         except Exception:
-            import traceback; traceback.print_exc();
+            traceback.print_exc()
             raise
 
 
@@ -384,7 +386,7 @@ def crawl_follows(pk, pagesource=None):
         #     print("[Debug] id:{} getFollows: ".format(userid.user_id),
         #           follows, file=sys.stderr)
     except Exception:
-        import traceback; traceback.print_exc();
+        traceback.print_exc()
         raise
 
     try:
@@ -399,7 +401,7 @@ def crawl_follows(pk, pagesource=None):
             #     print("{!r}".format(f), file=sys.stderr)
             rsp_data[v] = [f.follow_name]
     except Exception:
-        import traceback; traceback.print_exc();
+        traceback.print_exc()
         raise
     else:
         return rsp_data
@@ -413,7 +415,7 @@ def follows_crawl_of_userid(request, pk):
         try:
             rsp_data = crawl_follows(pk)
         except Exception:
-            import traceback; traceback.print_exc();
+            traceback.print_exc()
             raise
         else:
             return JsonResponse(rsp_data)
@@ -427,5 +429,5 @@ def follows_get_of_userid(request, pk):
                 for idx, _ in enumerate(userid.follows_set.all())}
         return JsonResponse(data)
     except Exception:
-        import traceback; traceback.print_exc();
+        traceback.print_exc()
         raise

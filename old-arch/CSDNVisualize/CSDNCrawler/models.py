@@ -1,8 +1,10 @@
 from django.db import models
 
 # Create your models here.
-from django.db.models import CharField, ForeignKey, DateTimeField, URLField
-from django.db.models import IntegerField, EmailField, BooleanField
+from django.db.models import CharField, ForeignKey, DateTimeField
+# from django.db.models import URLField
+from django.db.models import IntegerField, BooleanField
+# from django.db.models import EmailField
 
 from datetime import datetime
 from django.utils import timezone
@@ -107,11 +109,11 @@ class Follows(models.Model):
     current_total_follows_num = IntegerField(default=-1)
 
     def __eq__(self, other):
-      if not isinstance(other, Follows):
-        return NotImplemented
-      return str(self.followed_by) == str(other.followed_by) and \
-             self.follow_id == other.follow_id and \
-             self.follow_name == other.follow_name
+        if not isinstance(other, Follows):
+            return NotImplemented
+        return str(self.followed_by) == str(other.followed_by) and \
+            self.follow_id == other.follow_id and \
+            self.follow_name == other.follow_name
 
     def __str__(self):
         return "{} followed by {}".format(self.follow_id, self.followed_by)
