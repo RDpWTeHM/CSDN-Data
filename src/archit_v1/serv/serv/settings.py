@@ -25,7 +25,7 @@ SECRET_KEY = os.environ.get("DEV_CSDN_DATA_SECRET_KEY", "default_secret_key")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*", ]
 
 
 # Application definition
@@ -37,6 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # develop application
+    "csdndata.apps.CsdndataConfig",
 ]
 
 MIDDLEWARE = [
