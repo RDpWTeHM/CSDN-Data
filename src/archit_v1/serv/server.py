@@ -2,32 +2,17 @@
 """
 """
 
-import sys
+# import sys
 from time import sleep
-from time import ctime
-from functools import partial
-
-
-dbg_print = partial(print, file=sys.stderr)
+# from time import ctime
 
 
 def run():
     '''loop until universe collapses'''
 
-    while True:
-        try:
-            loop()
-        except Exception as err:
-            print("{}".format(err), file=sys.stderr)
-            sleep(10)
+    sleep(3)  # just want to wait django-server ready
 
-
-def loop():
-    from csdndata.models import UserID
-
-    sleep(5)
-
-    objs = UserID.objects.all()[:3]
-    dbg_print("##{}##".format(ctime()), end="  ", flush=True)
-    [dbg_print("{}".format(obj), end="\t", flush=True) for obj in objs]
-    dbg_print("")
+    # trick: use django-models,
+    # must import after `os.environ.setdefault(`
+    import producer
+    producer.run()
