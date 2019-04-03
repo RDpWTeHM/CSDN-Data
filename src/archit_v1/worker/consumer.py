@@ -7,6 +7,15 @@ QUEUE = 'csdndata'
 ROUTING_KEY = 'csdndata'
 
 
+def callback(ch, method, properties, body):
+    body = body.decode()
+    if body == "quit":
+        ch.basic_cancel(consumer_tag=ROUTING_KEY)
+        ch.stop_consuming()
+    else:
+        print(" [x] Received %r" % body)
+
+
 def rabbitmq_init(queue=QUEUE):
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(host=HOST_ADDR))
@@ -15,15 +24,6 @@ def rabbitmq_init(queue=QUEUE):
     channel.queue_declare(queue=queue)
 
     return connection, channel
-
-
-def callback(ch, method, properties, body):
-    body = body.decode()
-    if body == "quit":
-        ch.basic_cancel(consumer_tag=ROUTING_KEY)
-        ch.stop_consuming()
-    else:
-        print(" [x] Received %r" % body)
 
 
 def worker_be_consumer():
