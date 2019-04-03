@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+
 import pika
+
+from connection import crawl
 
 
 HOST_ADDR = 'localhost'
@@ -14,6 +17,11 @@ def callback(ch, method, properties, body):
         ch.stop_consuming()
     else:
         print(" [x] Received %r" % body)
+
+        crawler = crawl.Crawl()
+        crawler.execute(body)
+        print(crawler.result())
+        crawler.release()
 
 
 def rabbitmq_init(queue=QUEUE):
